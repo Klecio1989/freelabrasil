@@ -1,4 +1,7 @@
-// INICIO DO SITE FREELABRASIL
+import Link from "next/link";
+import Image from "next/image";
+
+// INICIO HOME
 export default function Home() {
   // CATEGORIAS DE SERVICOS
   const categorias = [
@@ -96,18 +99,33 @@ export default function Home() {
       {/* CABECALHO */}
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">FreelaBrasil</h1>
-            <p className="text-sm text-slate-400">Trabalhe para você mesmo</p>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt="Logo FreelaBrasil"
+              width={48}
+              height={48}
+              className="rounded-lg"
+            />
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">FreelaBrasil</h1>
+              <p className="text-sm text-slate-400">Trabalhe para você mesmo</p>
+            </div>
           </div>
 
           <div className="flex gap-3">
-            <button className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5">
+            <Link
+              href="/login"
+              className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5"
+            >
               Entrar
-            </button>
-            <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]">
+            </Link>
+            <Link
+              href="/cadastro"
+              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
+            >
               Criar conta
-            </button>
+            </Link>
           </div>
         </div>
       </header>
@@ -134,12 +152,18 @@ export default function Home() {
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <button className="rounded-2xl bg-emerald-400 px-6 py-3 text-base font-bold text-slate-950 transition hover:scale-[1.02]">
+              <Link
+                href="/cadastro"
+                className="rounded-2xl bg-emerald-400 px-6 py-3 text-center text-base font-bold text-slate-950 transition hover:scale-[1.02]"
+              >
                 Quero ser freelancer
-              </button>
-              <button className="rounded-2xl border border-white/15 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/5">
+              </Link>
+              <Link
+                href="/cadastro"
+                className="rounded-2xl border border-white/15 px-6 py-3 text-center text-base font-semibold text-white transition hover:bg-white/5"
+              >
                 Publicar projeto
-              </button>
+              </Link>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3 text-sm text-slate-300">
@@ -224,9 +248,12 @@ export default function Home() {
               </p>
             </div>
 
-            <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:scale-[1.02]">
-              Ver categorias
-            </button>
+            <Link
+              href="/projetos"
+              className="rounded-2xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:scale-[1.02]"
+            >
+              Ver projetos
+            </Link>
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -346,14 +373,14 @@ export default function Home() {
           </p>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Nome completo" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Data de nascimento" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="CPF ou CNPJ" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Cidade / UF" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Nome completo" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Data de nascimento" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="CPF ou CNPJ" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Cidade / UF" />
           </div>
 
           <textarea
-            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="mt-6 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3"
             placeholder="Resumo profissional"
             rows={5}
           />
@@ -385,32 +412,32 @@ export default function Home() {
           </p>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Nome da empresa ou responsável" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="CPF ou CNPJ" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Cidade / UF" />
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Tipo de profissional que busca" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Nome da empresa ou responsável" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="CPF ou CNPJ" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Cidade / UF" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Tipo de profissional que busca" />
           </div>
 
           <input
-            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="mt-6 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3"
             placeholder="Nome do projeto"
           />
 
           <textarea
-            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="mt-6 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3"
             placeholder="Descrição do projeto"
             rows={5}
           />
 
           <div className="mt-6 grid gap-6 md:grid-cols-3">
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Área do projeto" />
-            <select className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3">
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Área do projeto" />
+            <select className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3">
               <option>Selecione a faixa de orçamento</option>
               {orcamentos.map((item) => (
                 <option key={item}>{item}</option>
               ))}
             </select>
-            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Prazo em dias" />
+            <input className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3" placeholder="Prazo em dias" />
           </div>
         </div>
       </section>
@@ -431,4 +458,4 @@ export default function Home() {
     </main>
   );
 }
-// FIM DO SITE FREELABRASIL
+// FIM HOME
