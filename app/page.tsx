@@ -1,4 +1,6 @@
+// INICIO DO SITE FREELABRASIL
 export default function Home() {
+  // CATEGORIAS DE SERVICOS
   const categorias = [
     "Excel",
     "Power BI",
@@ -13,18 +15,20 @@ export default function Home() {
     "Design Gráfico",
     "SQL",
     "Tradutora / Dublagem",
+    "Análise de Dados",
   ];
 
+  // DESTAQUES PRINCIPAIS
   const destaques = [
     {
       titulo: "Freelancers de tecnologia e dados",
       descricao:
-        "Encontre profissionais para dashboards, automações, sites, apps, design e muito mais.",
+        "Encontre profissionais para dashboards, automações, sites, apps, design, idiomas e outros serviços digitais.",
     },
     {
       titulo: "Modelo simples e transparente",
       descricao:
-        "Plano gratuito com limite de ofertas e plano Plus com envio ilimitado de propostas.",
+        "Plano gratuito com limite de ofertas e planos pagos para freelancers que desejam ampliar suas oportunidades.",
     },
     {
       titulo: "Foco em resultado",
@@ -33,35 +37,63 @@ export default function Home() {
     },
   ];
 
+  // PLANOS DA PLATAFORMA
   const planos = [
     {
       nome: "Gratuito",
-      preco: "R$ 0",
+      precoMensal: "R$ 0",
+      precoAnual: "",
       destaque: false,
       beneficios: [
         "Criar perfil profissional",
-        "Mostrar portfólio",
-        "Publicar projetos no perfil",
+        "Publicar portfólio",
+        "Mostrar até 5 projetos",
         "Enviar até 2 ofertas de freela",
-        "Após isso, receber mensagens de contratantes",
+        "Após atingir o limite, receber mensagens de contratantes",
       ],
+      botao: "Começar grátis",
     },
     {
       nome: "Plus",
-      preco: "R$ 19,99/mês",
+      precoMensal: "R$ 19,99/mês",
+      precoAnual: "Anual: 12x de R$ 14,99",
       destaque: true,
       beneficios: [
         "Criar perfil completo",
-        "Mais visibilidade na plataforma",
-        "Publicar mais projetos",
-        "Enviar ofertas de trabalho à vontade",
+        "Publicar até 10 projetos",
+        "Aparecer com mais destaque",
+        "Enviar até 10 ofertas de trabalho por dia",
         "Receber mensagens de contratantes",
       ],
+      botao: "Assinar Plus",
     },
+    {
+      nome: "Pro",
+      precoMensal: "R$ 29,99/mês",
+      precoAnual: "Anual: 12x de R$ 24,99",
+      destaque: false,
+      beneficios: [
+        "Criar perfil completo",
+        "Publicar até 30 projetos",
+        "Maior destaque na plataforma",
+        "Enviar ofertas de trabalho ilimitadas",
+        "Receber mensagens de contratantes",
+      ],
+      botao: "Assinar Pro",
+    },
+  ];
+
+  // FAIXAS DE ORCAMENTO
+  const orcamentos = [
+    "Até R$ 500",
+    "R$ 500 – R$ 1.500",
+    "R$ 1.500 – R$ 5.000",
+    "Acima de R$ 5.000",
   ];
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      {/* CABECALHO */}
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <div>
@@ -80,6 +112,7 @@ export default function Home() {
         </div>
       </header>
 
+      {/* HERO / APRESENTACAO PRINCIPAL */}
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
@@ -92,10 +125,10 @@ export default function Home() {
             </h2>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-              Uma plataforma para conectar empresas e profissionais de{" "}
+              Conecte empresas e profissionais de{" "}
               <span className="font-semibold text-white">
                 Excel, Power BI, HTML, CSS, Java, apps mobile, Web Design,
-                Design Gráfico, SQL, Tradução e Dublagem
+                Design Gráfico, SQL, Tradução, Dublagem e Análise de Dados
               </span>
               .
             </p>
@@ -114,10 +147,10 @@ export default function Home() {
                 Plano gratuito com 2 ofertas
               </span>
               <span className="rounded-full border border-white/10 px-3 py-1">
-                Plano Plus com ofertas ilimitadas
+                Plus com 10 ofertas por dia
               </span>
               <span className="rounded-full border border-white/10 px-3 py-1">
-                R$ 19,99/mês
+                Pro com ofertas ilimitadas
               </span>
             </div>
           </div>
@@ -162,6 +195,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* CARDS DE DESTAQUE */}
       <section className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid gap-6 md:grid-cols-3">
           {destaques.map((item) => (
@@ -176,6 +210,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* CATEGORIAS */}
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 md:p-10">
           <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
@@ -188,6 +223,10 @@ export default function Home() {
                 idiomas e serviços digitais.
               </p>
             </div>
+
+            <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:scale-[1.02]">
+              Ver categorias
+            </button>
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -203,18 +242,19 @@ export default function Home() {
         </div>
       </section>
 
+      {/* PLANOS */}
       <section className="mx-auto max-w-7xl px-6 py-16" id="planos">
         <div className="text-center">
           <h2 className="text-3xl font-black md:text-4xl">
             Planos da plataforma
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-300">
-            Escolha entre o plano gratuito e o plano Plus para ampliar suas
-            oportunidades.
+            Escolha o plano ideal para ampliar suas oportunidades dentro do
+            FreelaBrasil.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
+        <div className="mt-10 grid gap-6 lg:grid-cols-3">
           {planos.map((plano) => (
             <div
               key={plano.nome}
@@ -227,7 +267,14 @@ export default function Home() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-2xl font-black">{plano.nome}</h3>
-                  <div className="mt-2 text-4xl font-black">{plano.preco}</div>
+                  <div className="mt-2 text-4xl font-black">
+                    {plano.precoMensal}
+                  </div>
+                  {plano.precoAnual && (
+                    <div className="mt-2 text-sm text-slate-300">
+                      {plano.precoAnual}
+                    </div>
+                  )}
                 </div>
 
                 {plano.destaque && (
@@ -255,13 +302,120 @@ export default function Home() {
                     : "bg-white text-slate-950"
                 }`}
               >
-                Escolher plano
+                {plano.botao}
               </button>
             </div>
           ))}
         </div>
       </section>
 
+      {/* PAGAMENTO */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+          <h2 className="text-3xl font-black">Pagamento</h2>
+          <p className="mt-4 text-slate-300">
+            Assine seu plano com segurança usando Mercado Pago.
+          </p>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+              <div className="text-sm text-slate-400">Forma de pagamento</div>
+              <div className="mt-2 text-lg font-bold">Mercado Pago</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+              <div className="text-sm text-slate-400">Opções</div>
+              <div className="mt-2 text-lg font-bold">PIX ou Cartão</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+              <div className="text-sm text-slate-400">Cobrança</div>
+              <div className="mt-2 text-lg font-bold">Mensal ou Anual</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CADASTRO FREELANCER */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+          <h2 className="text-3xl font-black">Cadastro do Freelancer</h2>
+          <p className="mt-4 text-slate-300">
+            Estrutura pensada para apresentar perfil, serviços, habilidades e
+            portfólio profissional.
+          </p>
+
+          <div className="mt-8 grid gap-6 md:grid-cols-2">
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Nome completo" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Data de nascimento" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="CPF ou CNPJ" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Cidade / UF" />
+          </div>
+
+          <textarea
+            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            placeholder="Resumo profissional"
+            rows={5}
+          />
+
+          <div className="mt-6">
+            <div className="mb-3 font-semibold">Nível de conhecimentos</div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {categorias.map((categoria) => (
+                <label
+                  key={categoria}
+                  className="rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm"
+                >
+                  <input type="checkbox" className="mr-2" />
+                  {categoria}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CADASTRO CONTRATANTE */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+          <h2 className="text-3xl font-black">Cadastro do Contratante</h2>
+          <p className="mt-4 text-slate-300">
+            Cadastre sua empresa ou perfil e publique projetos para encontrar o
+            profissional ideal.
+          </p>
+
+          <div className="mt-8 grid gap-6 md:grid-cols-2">
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Nome da empresa ou responsável" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="CPF ou CNPJ" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Cidade / UF" />
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Tipo de profissional que busca" />
+          </div>
+
+          <input
+            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            placeholder="Nome do projeto"
+          />
+
+          <textarea
+            className="mt-6 w-full rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            placeholder="Descrição do projeto"
+            rows={5}
+          />
+
+          <div className="mt-6 grid gap-6 md:grid-cols-3">
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Área do projeto" />
+            <select className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3">
+              <option>Selecione a faixa de orçamento</option>
+              {orcamentos.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </select>
+            <input className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3" placeholder="Prazo em dias" />
+          </div>
+        </div>
+      </section>
+
+      {/* RODAPE */}
       <footer className="border-t border-white/10 px-6 py-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <div>
@@ -277,3 +431,4 @@ export default function Home() {
     </main>
   );
 }
+// FIM DO SITE FREELABRASIL
