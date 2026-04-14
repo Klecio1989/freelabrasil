@@ -177,7 +177,19 @@ export default function CadastroPage() {
               className="mt-4 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3"
               placeholder="Descrição do projeto"
               rows={4}
-            />
+            /><label className="mt-4 block text-sm font-semibold text-slate-200">
+Anexar arquivos do projeto
+</label>
+
+<input
+type="file"
+multiple
+className="mt-2 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+/>
+
+<p className="text-xs text-slate-400 mt-2">
+Você pode anexar planilhas, PDFs, imagens ou documentos do projeto.
+</p>
           </div>
         </div>
       </section>
