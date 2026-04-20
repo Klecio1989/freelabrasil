@@ -1,47 +1,96 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabase";
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "../../lib/supabase";
 
-export default function LoginPage() {
+type UsuarioLogado = {
+  id: string;
+  nome: string;
+  email: string;
+  tipo_usuario: string;
+};
+
+export default function NovaPropostaPage() {
+  const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [carregando, setCarregando] = useState(false);
+  const projetoId = searchParams.get("projeto_id") || "";
 
-  async function entrar() {
-    if (!email || !senha) {
-      alert("Preencha email e senha.");
+  const [usuario, setUsuario] = useState<UsuarioLogado | null>(null);
+  const [valor, setValor] = useState("");
+  const [prazo, setPrazo] = useState("");
+  const [mensagem, setMensagem] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+
+  useEffect(() => {
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+    console.log("localStorage freelabrasil_usuario:", usuarioSalvo);
+
+    if (usuarioSalvo) {
+      const usuarioParseado = JSON.parse(usuarioSalvo) as UsuarioLogado;
+      console.log("usuário carregado:", usuarioParseado);
+      setUsuario(usuarioParseado);
+    }
+
+    setCarregandoUsuario(false);
+  }, []);
+
+  async function enviarProposta() {
+    console.log("clicou em enviar proposta");
+    console.log("usuario:", usuario);
+    console.log("projetoId:", projetoId);
+    console.log("valor:", valor);
+    console.log("prazo:", prazo);
+    console.log("mensagem:", mensagem);
+
+    if (!projetoId) {
+      alert("Projeto não identificado.");
+      return;
+    }
+
+    if (!usuario) {
+      alert("Você precisa estar logado.");
+      router.push("/login");
+      return;
+    }
+
+    if (usuario.tipo_usuario !== "freelancer") {
+      alert("Somente freelancers podem enviar propostas.");
+      return;
+    }
+
+    if (!valor || !prazo || !mensagem) {
+      alert("Preencha todos os campos.");
       return;
     }
 
     try {
       setCarregando(true);
 
-      const { data, error } = await supabase
-        .from("usuarios")
-        .select("*")
-        .eq("email", email)
-        .eq("senha", senha)
-        .single();
+      const { error } = await supabase.from("propostas").insert([
+        {
+          projeto_id: projetoId,
+          freelancer_id: usuario.id,
+          valor,
+          prazo: Number(prazo),
+          mensagem,
+        },
+      ]);
 
-      if (error || !data) {
-        alert("Usuário ou senha inválidos.");
+      if (error) {
+        console.log("erro supabase:", error);
+        alert(`Erro ao enviar proposta: ${error.message}`);
         return;
       }
 
-      if (data.tipo_usuario === "freelancer") {
-        router.push("/painel-freelancer");
-      } else if (data.tipo_usuario === "contratante") {
-        router.push("/painel-contratante");
-      } else {
-        alert("Tipo de usuário não identificado.");
-      }
+      alert("Proposta enviada com sucesso.");
+      router.push("/projetos");
     } catch (err) {
-      console.error("Erro no login:", err);
-      alert("Erro ao fazer login.");
+      console.error("erro geral:", err);
+      alert("Erro ao enviar proposta.");
     } finally {
       setCarregando(false);
     }
@@ -49,59 +98,84 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-white/10">
+      <header className="border-b border-white/10 bg-slate-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <div>
             <h1 className="text-2xl font-black tracking-tight">FreelaBrasil</h1>
-            <p className="text-sm text-slate-400">Acesse sua conta</p>
+            <p className="text-sm text-slate-400">Enviar proposta</p>
           </div>
 
-          <a
-            href="/"
+          <Link
+            href="/projetos"
             className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5"
           >
-            Voltar para home
-          </a>
+            Voltar para projetos
+          </Link>
         </div>
       </header>
 
-      <section className="mx-auto flex max-w-7xl items-center justify-center px-6 py-20">
-        <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/5 p-8">
-          <h2 className="text-3xl font-black">Entrar</h2>
-          <p className="mt-3 text-slate-300">
-            Entre com seu email e senha para acessar sua área.
-          </p>
+      <section className="mx-auto max-w-7xl px-6 py-14">
+        <div className="mb-10 max-w-3xl">
+          <h2 className="text-4xl font-black leading-tight md:text-5xl">
+            Envie sua proposta
+          </h2>
+        </div>
 
-          <div className="mt-8 grid gap-4">
-            <input
-              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              placeholder="Seu e-mail"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl">
+            <div className="rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-4">
+              <div className="text-sm text-slate-400">Freelancer logado</div>
+              <div className="mt-1 text-lg font-bold">
+                {carregandoUsuario
+                  ? "Carregando..."
+                  : usuario
+                  ? usuario.nome
+                  : "Nenhum usuário carregado"}
+              </div>
+              {usuario && (
+                <div className="mt-1 text-sm text-slate-400">{usuario.email}</div>
+              )}
+            </div>
 
-            <input
-              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-              placeholder="Sua senha"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
+            <div className="mt-8 grid gap-6">
+              <input
+                className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+                placeholder="Valor da proposta"
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+              />
 
-            <button
-              onClick={entrar}
-              disabled={carregando}
-              className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {carregando ? "Entrando..." : "Entrar"}
-            </button>
+              <input
+                className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+                placeholder="Prazo em dias"
+                value={prazo}
+                onChange={(e) => setPrazo(e.target.value)}
+              />
+
+              <textarea
+                className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"
+                placeholder="Mensagem da proposta"
+                value={mensagem}
+                onChange={(e) => setMensagem(e.target.value)}
+                rows={6}
+              />
+
+              <button
+                type="button"
+                onClick={enviarProposta}
+                disabled={carregando || carregandoUsuario}
+                className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {carregando ? "Enviando..." : "Enviar proposta"}
+              </button>
+            </div>
           </div>
 
-          <div className="mt-6 flex flex-col gap-2 text-sm text-slate-400">
-            <a href="/cadastro" className="hover:text-white">
-              Ainda não tenho conta
-            </a>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-7">
+            <div className="text-sm text-slate-400">Projeto selecionado</div>
+            <div className="mt-2 break-all text-lg font-bold">
+              {projetoId || "Projeto não informado"}
+            </div>
           </div>
         </div>
       </section>
