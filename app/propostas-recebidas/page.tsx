@@ -8,6 +8,7 @@ type Proposta = {
   valor: string;
   prazo: number;
   mensagem: string;
+  status: string;
   projetos: { titulo: string };
   usuarios: { nome: string; email: string };
 };
@@ -32,12 +33,26 @@ export default function PropostasRecebidas() {
         valor,
         prazo,
         mensagem,
+        status,
         projetos(titulo),
         usuarios(nome,email)
       `)
       .eq("contratante_id", contratanteId);
 
     if (data) setPropostas(data as any);
+  }
+
+  async function atualizarStatus(id: string, status: string) {
+    await supabase
+      .from("propostas")
+      .update({ status })
+      .eq("id", id);
+
+    setPropostas((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status } : p
+      )
+    );
   }
 
   return (
@@ -60,6 +75,28 @@ export default function PropostasRecebidas() {
             <p>Prazo: {p.prazo} dias</p>
 
             <p className="mt-4 text-slate-300">{p.mensagem}</p>
+
+            <p className="mt-4 text-sm">
+              Status: <b>{p.status || "pendente"}</b>
+            </p>
+
+            {(!p.status || p.status === "pendente") && (
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => atualizarStatus(p.id, "aceita")}
+                  className="bg-emerald-400 text-black px-4 py-2 rounded"
+                >
+                  Aceitar
+                </button>
+
+                <button
+                  onClick={() => atualizarStatus(p.id, "recusada")}
+                  className="bg-red-500 text-white px-4 py-2 rounded"
+                >
+                  Recusar
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
