@@ -21,8 +21,20 @@ export default function FreelancersPage() {
   const [busca, setBusca] = useState("");
   const [filtroPlano, setFiltroPlano] = useState("todos");
   const [filtroCidade, setFiltroCidade] = useState("");
+  const [usuario, setUsuario] = useState<any>(null);
+  const [favoritos, setFavoritos] = useState<string[]>([]);
 
   useEffect(() => {
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+    if (usuarioSalvo) {
+      const parsed = JSON.parse(usuarioSalvo);
+      setUsuario(parsed);
+
+      if (parsed.tipo_usuario === "contratante") {
+        carregarFavoritos(parsed.id);
+      }
+    }
+
     carregarFreelancers();
   }, []);
 
@@ -46,16 +58,12 @@ export default function FreelancersPage() {
       const prioridadeA = prioridadePlano[a.plano || "gratuito"];
       const prioridadeB = prioridadePlano[b.plano || "gratuito"];
 
-      if (prioridadeA !== prioridadeB) {
-        return prioridadeA - prioridadeB;
-      }
+      if (prioridadeA !== prioridadeB) return prioridadeA - prioridadeB;
 
       const notaA = Number(a.nota_media || 0);
       const notaB = Number(b.nota_media || 0);
 
-      if (notaA !== notaB) {
-        return notaB - notaA;
-      }
+      if (notaA !== notaB) return notaB - notaA;
 
       const concluidosA = Number(a.projetos_concluidos || 0);
       const concluidosB = Number(b.projetos_concluidos || 0);
@@ -66,17 +74,53 @@ export default function FreelancersPage() {
     setFreelancers(ordenados as Freelancer[]);
   }
 
+  async function carregarFavoritos(contratanteId: string) {
+    const { data } = await supabase
+      .from("favoritos")
+      .select("freelancer_id")
+      .eq("contratante_id", contratanteId);
+
+    if (!data) return;
+
+    setFavoritos(data.map((item: any) => item.freelancer_id));
+  }
+
+  async function toggleFavorito(freelancerId: string) {
+    if (!usuario || usuario.tipo_usuario !== "contratante") {
+      alert("Apenas contratantes podem favoritar freelancers.");
+      return;
+    }
+
+    const jaFavorito = favoritos.includes(freelancerId);
+
+    if (jaFavorito) {
+      await supabase
+        .from("favoritos")
+        .delete()
+        .eq("contratante_id", usuario.id)
+        .eq("freelancer_id", freelancerId);
+
+      setFavoritos((prev) => prev.filter((id) => id !== freelancerId));
+      return;
+    }
+
+    await supabase.from("favoritos").insert([
+      {
+        contratante_id: usuario.id,
+        freelancer_id: freelancerId,
+      },
+    ]);
+
+    setFavoritos((prev) => [...prev, freelancerId]);
+  }
+
   const freelancersFiltrados = useMemo(() => {
     return freelancers.filter((f) => {
       const texto = `${f.nome || ""} ${f.cidade || ""} ${f.habilidades || ""} ${f.descricao || ""}`.toLowerCase();
 
-      const bateBusca = busca
-        ? texto.includes(busca.toLowerCase())
-        : true;
-
+      const bateBusca = busca ? texto.includes(busca.toLowerCase()) : true;
       const batePlano =
         filtroPlano === "todos" ? true : (f.plano || "gratuito") === filtroPlano;
-
       const bateCidade = filtroCidade
         ? (f.cidade || "").toLowerCase().includes(filtroCidade.toLowerCase())
         : true;
@@ -166,71 +210,84 @@ export default function FreelancersPage() {
         </div>
 
         <div className="grid gap-6">
-          {freelancersFiltrados.map((f, index) => (
-            <div
-              key={f.id}
-              className={`rounded-2xl border p-6 ${cardDestaque(f.plano)}`}
-            >
-              <div className="grid lg:grid-cols-[100px_1fr_auto] gap-6 items-center">
-                <div className="flex justify-center">
-                  <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
-                    {f.foto_url ? (
-                      <img
-                        src={f.foto_url}
-                        alt={f.nome}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl font-bold">
-                        {f.nome?.charAt(0)?.toUpperCase() || "U"}
+          {freelancersFiltrados.map((f, index) => {
+            const favorito = favoritos.includes(f.id);
+
+            return (
+              <div
+                key={f.id}
+                className={`rounded-2xl border p-6 ${cardDestaque(f.plano)}`}
+              >
+                <div className="grid lg:grid-cols-[100px_1fr_auto] gap-6 items-center">
+                  <div className="flex justify-center">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+                      {f.foto_url ? (
+                        <img
+                          src={f.foto_url}
+                          alt={f.nome}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold">
+                          {f.nome?.charAt(0)?.toUpperCase() || "U"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm text-slate-400">#{index + 1}</span>
+                      <h2 className="text-2xl font-bold">{f.nome}</h2>
+                      {badgePlano(f.plano)}
+                    </div>
+
+                    <p className="text-slate-400 mt-2">{f.cidade || "-"}</p>
+
+                    <p className="text-slate-300 mt-3 line-clamp-2">
+                      {f.descricao || "Sem descrição cadastrada."}
+                    </p>
+
+                    <div className="flex flex-wrap gap-6 mt-4 text-sm">
+                      <span className="text-yellow-400 font-bold">
+                        ⭐ {Number(f.nota_media || 0).toFixed(1)}
                       </span>
+
+                      <span className="text-slate-300">
+                        {f.projetos_concluidos || 0} projetos concluídos
+                      </span>
+
+                      <span className="text-slate-400">
+                        {f.habilidades || "Sem habilidades"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <Link
+                      href={`/freelancer/${f.id}`}
+                      className="inline-block bg-emerald-400 text-black px-5 py-3 rounded-lg font-bold text-center"
+                    >
+                      Ver perfil
+                    </Link>
+
+                    {usuario?.tipo_usuario === "contratante" && (
+                      <button
+                        onClick={() => toggleFavorito(f.id)}
+                        className={`px-5 py-3 rounded-lg font-bold ${
+                          favorito
+                            ? "bg-yellow-400 text-black"
+                            : "border border-white/20 text-white"
+                        }`}
+                      >
+                        {favorito ? "★ Favoritado" : "☆ Favoritar"}
+                      </button>
                     )}
                   </div>
                 </div>
-
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm text-slate-400">
-                      #{index + 1}
-                    </span>
-
-                    <h2 className="text-2xl font-bold">{f.nome}</h2>
-
-                    {badgePlano(f.plano)}
-                  </div>
-
-                  <p className="text-slate-400 mt-2">{f.cidade || "-"}</p>
-
-                  <p className="text-slate-300 mt-3 line-clamp-2">
-                    {f.descricao || "Sem descrição cadastrada."}
-                  </p>
-
-                  <div className="flex flex-wrap gap-6 mt-4 text-sm">
-                    <span className="text-yellow-400 font-bold">
-                      ⭐ {Number(f.nota_media || 0).toFixed(1)}
-                    </span>
-
-                    <span className="text-slate-300">
-                      {f.projetos_concluidos || 0} projetos concluídos
-                    </span>
-
-                    <span className="text-slate-400">
-                      {f.habilidades || "Sem habilidades"}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <Link
-                    href={`/freelancer/${f.id}`}
-                    className="inline-block bg-emerald-400 text-black px-5 py-3 rounded-lg font-bold"
-                  >
-                    Ver perfil
-                  </Link>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </main>
