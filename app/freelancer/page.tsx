@@ -16,6 +16,11 @@ type Freelancer = {
   projetos_concluidos?: number;
 };
 
+type Projeto = {
+  id: string;
+  titulo: string;
+};
+
 export default function FreelancersPage() {
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
   const [busca, setBusca] = useState("");
@@ -23,6 +28,11 @@ export default function FreelancersPage() {
   const [filtroCidade, setFiltroCidade] = useState("");
   const [usuario, setUsuario] = useState<any>(null);
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [freelancerSelecionado, setFreelancerSelecionado] = useState<string>("");
+  const [projetoSelecionado, setProjetoSelecionado] = useState("");
+  const [mensagemConvite, setMensagemConvite] = useState("");
+  const [abrirConvite, setAbrirConvite] = useState(false);
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
@@ -32,6 +42,7 @@ export default function FreelancersPage() {
 
       if (parsed.tipo_usuario === "contratante") {
         carregarFavoritos(parsed.id);
+        carregarProjetos(parsed.id);
       }
     }
 
@@ -85,6 +96,16 @@ export default function FreelancersPage() {
     setFavoritos(data.map((item: any) => item.freelancer_id));
   }
 
+  async function carregarProjetos(contratanteId: string) {
+    const { data } = await supabase
+      .from("projetos")
+      .select("id,titulo")
+      .eq("contratante_id", contratanteId)
+      .order("created_at", { ascending: false });
+
+    if (data) setProjetos(data as Projeto[]);
+  }
+
   async function toggleFavorito(freelancerId: string) {
     if (!usuario || usuario.tipo_usuario !== "contratante") {
       alert("Apenas contratantes podem favoritar freelancers.");
@@ -114,6 +135,38 @@ export default function FreelancersPage() {
     setFavoritos((prev) => [...prev, freelancerId]);
   }
 
+  function abrirModalConvite(freelancerId: string) {
+    setFreelancerSelecionado(freelancerId);
+    setProjetoSelecionado("");
+    setMensagemConvite("");
+    setAbrirConvite(true);
+  }
+
+  async function enviarConvite() {
+    if (!usuario || !freelancerSelecionado || !projetoSelecionado) {
+      alert("Selecione um projeto.");
+      return;
+    }
+
+    const { error } = await supabase.from("convites").insert([
+      {
+        contratante_id: usuario.id,
+        freelancer_id: freelancerSelecionado,
+        projeto_id: projetoSelecionado,
+        mensagem: mensagemConvite,
+        status: "pendente",
+      },
+    ]);
+
+    if (error) {
+      alert("Erro ao enviar convite.");
+      return;
+    }
+
+    alert("Convite enviado com sucesso.");
+    setAbrirConvite(false);
+  }
+
   const freelancersFiltrados = useMemo(() => {
     return freelancers.filter((f) => {
       const texto = `${f.nome || ""} ${f.cidade || ""} ${f.habilidades || ""} ${f.descricao || ""}`.toLowerCase();
@@ -131,26 +184,14 @@ export default function FreelancersPage() {
 
   function badgePlano(plano?: string) {
     if (plano === "pro") {
-      return (
-        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
-          PRO
-        </span>
-      );
+      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
     }
 
     if (plano === "plus") {
-      return (
-        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-          PLUS
-        </span>
-      );
+      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
     }
 
-    return (
-      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
-        GRATUITO
-      </span>
-    );
+    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
   }
 
   function cardDestaque(plano?: string) {
@@ -272,16 +313,25 @@ export default function FreelancersPage() {
                     </Link>
 
                     {usuario?.tipo_usuario === "contratante" && (
-                      <button
-                        onClick={() => toggleFavorito(f.id)}
-                        className={`px-5 py-3 rounded-lg font-bold ${
-                          favorito
-                            ? "bg-yellow-400 text-black"
-                            : "border border-white/20 text-white"
-                        }`}
-                      >
-                        {favorito ? "★ Favoritado" : "☆ Favoritar"}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => toggleFavorito(f.id)}
+                          className={`px-5 py-3 rounded-lg font-bold ${
+                            favorito
+                              ? "bg-yellow-400 text-black"
+                              : "border border-white/20 text-white"
+                          }`}
+                        >
+                          {favorito ? "★ Favoritado" : "☆ Favoritar"}
+                        </button>
+
+                        <button
+                          onClick={() => abrirModalConvite(f.id)}
+                          className="bg-white text-black px-5 py-3 rounded-lg font-bold"
+                        >
+                          Convidar
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -289,6 +339,53 @@ export default function FreelancersPage() {
             );
           })}
         </div>
+
+        {abrirConvite && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-6 z-50">
+            <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 p-8">
+              <h2 className="text-2xl font-bold mb-6">Enviar convite</h2>
+
+              <div className="space-y-4">
+                <select
+                  value={projetoSelecionado}
+                  onChange={(e) => setProjetoSelecionado(e.target.value)}
+                  className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                >
+                  <option value="">Selecione um projeto</option>
+                  {projetos.map((projeto) => (
+                    <option key={projeto.id} value={projeto.id}>
+                      {projeto.titulo}
+                    </option>
+                  ))}
+                </select>
+
+                <textarea
+                  value={mensagemConvite}
+                  onChange={(e) => setMensagemConvite(e.target.value)}
+                  rows={5}
+                  placeholder="Mensagem do convite"
+                  className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                />
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={enviarConvite}
+                    className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
+                  >
+                    Enviar convite
+                  </button>
+
+                  <button
+                    onClick={() => setAbrirConvite(false)}
+                    className="border border-white/20 px-6 py-3 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
