@@ -4,181 +4,156 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 
-type Stats = {
-  projetos: number;
-  propostasRecebidas: number;
-  propostasEnviadas: number;
-  convitesRecebidos: number;
-  favoritos: number;
-  notificacoesNaoLidas: number;
-};
-
-export default function DashboardPage() {
+export default function Dashboard() {
   const [usuario, setUsuario] = useState<any>(null);
-  const [stats, setStats] = useState<Stats>({
-    projetos: 0,
-    propostasRecebidas: 0,
-    propostasEnviadas: 0,
-    convitesRecebidos: 0,
-    favoritos: 0,
-    notificacoesNaoLidas: 0,
-  });
+
+  const [projetos, setProjetos] = useState(0);
+  const [propostas, setPropostas] = useState(0);
+  const [convites, setConvites] = useState(0);
+  const [favoritos, setFavoritos] = useState(0);
 
   useEffect(() => {
-    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (usuarioSalvo) {
-      const parsed = JSON.parse(usuarioSalvo);
+    const user = localStorage.getItem("freelabrasil_usuario");
+
+    if (user) {
+      const parsed = JSON.parse(user);
       setUsuario(parsed);
-      carregarDashboard(parsed);
+      carregarDados(parsed);
     }
   }, []);
 
-  async function carregarDashboard(usuarioAtual: any) {
-    const { count: notificacoesNaoLidas } = await supabase
-      .from("notificacoes")
-      .select("*", { count: "exact", head: true })
-      .eq("usuario_id", usuarioAtual.id)
-      .eq("lida", false);
-
-    if (usuarioAtual.tipo_usuario === "contratante") {
-      const { data: projetos } = await supabase
+  async function carregarDados(user: any) {
+    if (user.tipo_usuario === "contratante") {
+      const { data: projetosData } = await supabase
         .from("projetos")
         .select("id")
-        .eq("contratante_id", usuarioAtual.id);
+        .eq("contratante_id", user.id);
 
-      const projetoIds = projetos?.map((p: any) => p.id) || [];
+      const projetoIds = projetosData?.map((p: any) => p.id) || [];
 
-      let propostasRecebidas = 0;
+      const { data: propostasData } = await supabase
+        .from("propostas")
+        .select("id")
+        .in("projeto_id", projetoIds);
 
-      if (projetoIds.length > 0) {
-        const { count } = await supabase
-          .from("propostas")
-          .select("*", { count: "exact", head: true })
-          .in("projeto_id", projetoIds);
-
-        propostasRecebidas = count || 0;
-      }
-
-      const { count: favoritos } = await supabase
+      const { data: favoritosData } = await supabase
         .from("favoritos")
-        .select("*", { count: "exact", head: true })
-        .eq("contratante_id", usuarioAtual.id);
+        .select("id")
+        .eq("contratante_id", user.id);
 
-      setStats({
-        projetos: projetos?.length || 0,
-        propostasRecebidas,
-        propostasEnviadas: 0,
-        convitesRecebidos: 0,
-        favoritos: favoritos || 0,
-        notificacoesNaoLidas: notificacoesNaoLidas || 0,
-      });
+      const { data: convitesData } = await supabase
+        .from("convites")
+        .select("id")
+        .eq("contratante_id", user.id);
 
-      return;
+      setProjetos(projetosData?.length || 0);
+      setPropostas(propostasData?.length || 0);
+      setFavoritos(favoritosData?.length || 0);
+      setConvites(convitesData?.length || 0);
     }
 
-    const { count: propostasEnviadas } = await supabase
-      .from("propostas")
-      .select("*", { count: "exact", head: true })
-      .eq("freelancer_id", usuarioAtual.id);
+    if (user.tipo_usuario === "freelancer") {
+      const { data: propostasData } = await supabase
+        .from("propostas")
+        .select("id,status")
+        .eq("freelancer_id", user.id);
 
-    const { count: convitesRecebidos } = await supabase
-      .from("convites")
-      .select("*", { count: "exact", head: true })
-      .eq("freelancer_id", usuarioAtual.id);
+      const { data: convitesData } = await supabase
+        .from("convites")
+        .select("id,status")
+        .eq("freelancer_id", user.id);
 
-    setStats({
-      projetos: 0,
-      propostasRecebidas: 0,
-      propostasEnviadas: propostasEnviadas || 0,
-      convitesRecebidos: convitesRecebidos || 0,
-      favoritos: 0,
-      notificacoesNaoLidas: notificacoesNaoLidas || 0,
-    });
+      setPropostas(propostasData?.length || 0);
+      setConvites(convitesData?.length || 0);
+    }
   }
 
-  function card(titulo: string, valor: number, cor = "border-white/10") {
+  function card(titulo: string, valor: number) {
     return (
-      <div className={`rounded-2xl border ${cor} bg-slate-900 p-6`}>
-        <p className="text-sm text-slate-400">{titulo}</p>
-        <p className="text-3xl font-bold mt-2">{valor}</p>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="text-sm text-slate-400">{titulo}</div>
+        <div className="mt-2 text-3xl font-black">{valor}</div>
       </div>
-    );
-  }
-
-  if (!usuario) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <p>Carregando dashboard...</p>
-      </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
+    <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-4xl font-bold">Dashboard</h1>
-            <p className="text-slate-400 mt-2">
-              Resumo rápido da sua conta
-            </p>
-          </div>
-
-          <Link
-            href={usuario.tipo_usuario === "contratante" ? "/painel-contratante" : "/painel-freelancer"}
-            className="border border-white/20 px-4 py-2 rounded-lg"
-          >
-            Voltar
-          </Link>
+        <div className="mb-10">
+          <h1 className="text-5xl font-black">Dashboard</h1>
+          <p className="text-slate-400 mt-3">
+            Visão geral da sua conta e performance na plataforma
+          </p>
         </div>
 
-        {usuario.tipo_usuario === "contratante" ? (
-          <>
-            <div className="grid md:grid-cols-4 gap-6">
-              {card("Projetos publicados", stats.projetos, "border-emerald-400/20")}
-              {card("Propostas recebidas", stats.propostasRecebidas, "border-white/10")}
-              {card("Favoritos", stats.favoritos, "border-white/10")}
-              {card("Notificações novas", stats.notificacoesNaoLidas, "border-yellow-400/20")}
-            </div>
+        {/* KPIs */}
+        <div className="grid md:grid-cols-4 gap-4 mb-10">
+          {card("Projetos", projetos)}
+          {card("Propostas", propostas)}
+          {card("Convites", convites)}
+          {card("Favoritos", favoritos)}
+        </div>
 
-            <div className="grid md:grid-cols-3 gap-4 mt-10">
-              <Link href="/projetos/novo" className="bg-emerald-400 text-black px-6 py-4 rounded-xl font-bold text-center">
-                Criar novo projeto
+        {/* Ações rápidas */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {usuario?.tipo_usuario === "contratante" && (
+            <>
+              <Link href="/projetos/novo" className="btn">
+                Criar projeto
               </Link>
 
-              <Link href="/propostas-recebidas" className="bg-white text-black px-6 py-4 rounded-xl font-bold text-center">
-                Ver propostas
+              <Link href="/propostas-recebidas" className="btn">
+                Ver propostas recebidas
               </Link>
 
-              <Link href="/freelancers" className="border border-white/20 px-6 py-4 rounded-xl font-bold text-center">
+              <Link href="/freelancers" className="btn">
                 Buscar freelancers
               </Link>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="grid md:grid-cols-3 gap-6">
-              {card("Propostas enviadas", stats.propostasEnviadas, "border-emerald-400/20")}
-              {card("Convites recebidos", stats.convitesRecebidos, "border-white/10")}
-              {card("Notificações novas", stats.notificacoesNaoLidas, "border-yellow-400/20")}
-            </div>
 
-            <div className="grid md:grid-cols-3 gap-4 mt-10">
-              <Link href="/projetos" className="bg-emerald-400 text-black px-6 py-4 rounded-xl font-bold text-center">
-                Ver projetos
+              <Link href="/favoritos" className="btn">
+                Meus favoritos
+              </Link>
+            </>
+          )}
+
+          {usuario?.tipo_usuario === "freelancer" && (
+            <>
+              <Link href="/projetos" className="btn">
+                Buscar projetos
               </Link>
 
-              <Link href="/minhas-propostas" className="bg-white text-black px-6 py-4 rounded-xl font-bold text-center">
+              <Link href="/minhas-propostas" className="btn">
                 Minhas propostas
               </Link>
 
-              <Link href="/convites" className="border border-white/20 px-6 py-4 rounded-xl font-bold text-center">
-                Meus convites
+              <Link href="/convites" className="btn">
+                Convites recebidos
               </Link>
-            </div>
-          </>
-        )}
+
+              <Link href="/perfil" className="btn">
+                Editar perfil
+              </Link>
+            </>
+          )}
+        </div>
       </div>
+
+      <style jsx>{`
+        .btn {
+          display: block;
+          padding: 16px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.1);
+          text-align: center;
+          font-weight: bold;
+          transition: 0.2s;
+        }
+
+        .btn:hover {
+          background: rgba(255,255,255,0.05);
+        }
+      `}</style>
     </main>
   );
 }

@@ -169,7 +169,8 @@ export default function FreelancersPage() {
 
   const freelancersFiltrados = useMemo(() => {
     return freelancers.filter((f) => {
-      const texto = `${f.nome || ""} ${f.cidade || ""} ${f.habilidades || ""} ${f.descricao || ""}`.toLowerCase();
+      const texto =
+        `${f.nome || ""} ${f.cidade || ""} ${f.habilidades || ""} ${f.descricao || ""}`.toLowerCase();
 
       const bateBusca = busca ? texto.includes(busca.toLowerCase()) : true;
       const batePlano =
@@ -184,53 +185,82 @@ export default function FreelancersPage() {
 
   function badgePlano(plano?: string) {
     if (plano === "pro") {
-      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
+      return (
+        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
+          PRO
+        </span>
+      );
     }
 
     if (plano === "plus") {
-      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
+      return (
+        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
+          PLUS
+        </span>
+      );
     }
 
-    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
+    return (
+      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
+        GRATUITO
+      </span>
+    );
   }
 
   function cardDestaque(plano?: string) {
-    if (plano === "pro") return "border-purple-500/50 bg-purple-500/5";
+    if (plano === "pro") return "border-purple-500/40 bg-purple-500/5";
     if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/5";
-    return "border-white/10 bg-slate-900";
+    return "border-white/10 bg-white/5";
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-4xl font-bold">Freelancers</h1>
-            <p className="text-slate-400 mt-2">
-              Ranking por plano, nota e projetos concluídos
+    <main className="min-h-screen bg-slate-950 text-white">
+      <section className="mx-auto max-w-7xl px-6 py-14">
+        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <span className="inline-flex rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-300">
+              Talentos em destaque
+            </span>
+
+            <h1 className="mt-5 text-5xl font-black leading-tight">
+              Encontre freelancers qualificados
+            </h1>
+
+            <p className="mt-5 text-lg leading-8 text-slate-300">
+              Descubra profissionais com ranking, avaliações, portfólio e destaque por plano.
             </p>
           </div>
 
-          <Link
-            href="/projetos"
-            className="border border-white/20 px-4 py-2 rounded-lg"
-          >
-            Voltar
-          </Link>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-sm text-slate-400">Freelancers</div>
+              <div className="mt-1 text-2xl font-black">{freelancersFiltrados.length}</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-sm text-slate-400">Prioridade</div>
+              <div className="mt-1 text-2xl font-black">Pro / Plus</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-sm text-slate-400">Busca</div>
+              <div className="mt-1 text-2xl font-black">Ativa</div>
+            </div>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
+        <div className="mb-8 grid gap-4 md:grid-cols-3">
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome, habilidade ou descrição"
-            className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
           />
 
           <select
             value={filtroPlano}
             onChange={(e) => setFiltroPlano(e.target.value)}
-            className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
           >
             <option value="todos">Todos os planos</option>
             <option value="pro">Pro</option>
@@ -242,13 +272,18 @@ export default function FreelancersPage() {
             value={filtroCidade}
             onChange={(e) => setFiltroCidade(e.target.value)}
             placeholder="Filtrar por cidade"
-            className="rounded-xl bg-slate-900 border border-white/10 px-4 py-3"
+            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
           />
         </div>
 
-        <div className="mb-6 text-sm text-slate-400">
-          {freelancersFiltrados.length} freelancer(s) encontrado(s)
-        </div>
+        {!freelancersFiltrados.length && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center">
+            <h2 className="text-2xl font-black">Nenhum freelancer encontrado</h2>
+            <p className="mt-3 text-slate-400">
+              Ajuste os filtros para visualizar outros profissionais.
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-6">
           {freelancersFiltrados.map((f, index) => {
@@ -257,19 +292,21 @@ export default function FreelancersPage() {
             return (
               <div
                 key={f.id}
-                className={`rounded-2xl border p-6 ${cardDestaque(f.plano)}`}
+                className={`rounded-[2rem] border p-6 shadow-2xl transition hover:scale-[1.005] ${cardDestaque(
+                  f.plano
+                )}`}
               >
-                <div className="grid lg:grid-cols-[100px_1fr_auto] gap-6 items-center">
+                <div className="grid gap-6 lg:grid-cols-[100px_1fr_auto] lg:items-center">
                   <div className="flex justify-center">
-                    <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-slate-700">
                       {f.foto_url ? (
                         <img
                           src={f.foto_url}
                           alt={f.nome}
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
-                        <span className="text-2xl font-bold">
+                        <span className="text-3xl font-bold">
                           {f.nome?.charAt(0)?.toUpperCase() || "U"}
                         </span>
                       )}
@@ -279,35 +316,35 @@ export default function FreelancersPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-sm text-slate-400">#{index + 1}</span>
-                      <h2 className="text-2xl font-bold">{f.nome}</h2>
+                      <h2 className="text-2xl font-black">{f.nome}</h2>
                       {badgePlano(f.plano)}
                     </div>
 
-                    <p className="text-slate-400 mt-2">{f.cidade || "-"}</p>
+                    <p className="mt-2 text-slate-400">{f.cidade || "-"}</p>
 
-                    <p className="text-slate-300 mt-3 line-clamp-2">
+                    <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
                       {f.descricao || "Sem descrição cadastrada."}
                     </p>
 
-                    <div className="flex flex-wrap gap-6 mt-4 text-sm">
-                      <span className="text-yellow-400 font-bold">
+                    <div className="mt-5 flex flex-wrap gap-4 text-sm">
+                      <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 font-bold text-yellow-300">
                         ⭐ {Number(f.nota_media || 0).toFixed(1)}
                       </span>
 
-                      <span className="text-slate-300">
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-slate-300">
                         {f.projetos_concluidos || 0} projetos concluídos
                       </span>
 
-                      <span className="text-slate-400">
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-slate-300">
                         {f.habilidades || "Sem habilidades"}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex min-w-[230px] flex-col gap-3">
                     <Link
                       href={`/freelancer/${f.id}`}
-                      className="inline-block bg-emerald-400 text-black px-5 py-3 rounded-lg font-bold text-center"
+                      className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02]"
                     >
                       Ver perfil
                     </Link>
@@ -316,10 +353,10 @@ export default function FreelancersPage() {
                       <>
                         <button
                           onClick={() => toggleFavorito(f.id)}
-                          className={`px-5 py-3 rounded-lg font-bold ${
+                          className={`rounded-xl px-5 py-3 font-bold ${
                             favorito
                               ? "bg-yellow-400 text-black"
-                              : "border border-white/20 text-white"
+                              : "border border-white/20 text-white hover:bg-white/5"
                           }`}
                         >
                           {favorito ? "★ Favoritado" : "☆ Favoritar"}
@@ -327,7 +364,7 @@ export default function FreelancersPage() {
 
                         <button
                           onClick={() => abrirModalConvite(f.id)}
-                          className="bg-white text-black px-5 py-3 rounded-lg font-bold"
+                          className="rounded-xl border border-white/20 px-5 py-3 font-bold text-white hover:bg-white/5"
                         >
                           Convidar
                         </button>
@@ -341,15 +378,18 @@ export default function FreelancersPage() {
         </div>
 
         {abrirConvite && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-6 z-50">
-            <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-slate-900 p-8">
-              <h2 className="text-2xl font-bold mb-6">Enviar convite</h2>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+            <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-slate-900 p-8">
+              <h2 className="text-3xl font-black">Enviar convite</h2>
+              <p className="mt-2 text-slate-400">
+                Escolha um projeto e envie uma mensagem ao freelancer.
+              </p>
 
-              <div className="space-y-4">
+              <div className="mt-6 space-y-4">
                 <select
                   value={projetoSelecionado}
                   onChange={(e) => setProjetoSelecionado(e.target.value)}
-                  className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
                 >
                   <option value="">Selecione um projeto</option>
                   {projetos.map((projeto) => (
@@ -364,20 +404,20 @@ export default function FreelancersPage() {
                   onChange={(e) => setMensagemConvite(e.target.value)}
                   rows={5}
                   placeholder="Mensagem do convite"
-                  className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none placeholder:text-slate-500"
                 />
 
                 <div className="flex gap-4">
                   <button
                     onClick={enviarConvite}
-                    className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
+                    className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
                   >
                     Enviar convite
                   </button>
 
                   <button
                     onClick={() => setAbrirConvite(false)}
-                    className="border border-white/20 px-6 py-3 rounded-lg"
+                    className="rounded-xl border border-white/20 px-6 py-3 font-medium text-white"
                   >
                     Cancelar
                   </button>
@@ -386,7 +426,7 @@ export default function FreelancersPage() {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </main>
   );
 }
