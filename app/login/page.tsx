@@ -147,6 +147,16 @@ export default function LoginPage() {
               </p>
 
               <p>
+                Esqueceu sua senha?{" "}
+                <Link
+                  href="/esqueci-senha"
+                  className="font-semibold text-yellow-300"
+                >
+                  Redefinir senha
+                </Link>
+              </p>
+
+              <p>
                 Conta desativada?{" "}
                 <Link
                   href="/admin/reactivar"
