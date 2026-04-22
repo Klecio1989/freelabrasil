@@ -76,6 +76,13 @@ export default function PainelFreelancer() {
           </Link>
 
           <Link
+            href="/notificacoes"
+            className="border border-white/20 px-6 py-3 rounded-lg"
+          >
+            Notificações
+          </Link>
+
+          <Link
             href="/perfil"
             className="border border-white/20 px-6 py-3 rounded-lg"
           >

@@ -69,8 +69,20 @@ export default function ConvitesPage() {
     setConvites(formatados);
   }
 
-  async function atualizarStatus(id: string, status: string) {
+  async function atualizarStatus(id: string, status: string, projetoTitulo?: string) {
+    if (!usuario) return;
+
     await supabase.from("convites").update({ status }).eq("id", id);
+
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: usuario.id,
+        titulo: status === "aceito" ? "Convite aceito" : "Convite recusado",
+        descricao: `Você ${status === "aceito" ? "aceitou" : "recusou"} o convite do projeto ${projetoTitulo || ""}.`,
+        lida: false,
+        link: "/convites",
+      },
+    ]);
 
     setConvites((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status } : c))
@@ -119,14 +131,14 @@ export default function ConvitesPage() {
               {(!convite.status || convite.status === "pendente") && (
                 <div className="flex gap-3 mt-6">
                   <button
-                    onClick={() => atualizarStatus(convite.id, "aceito")}
+                    onClick={() => atualizarStatus(convite.id, "aceito", convite.projeto_titulo)}
                     className="bg-emerald-400 text-black px-5 py-3 rounded-lg font-bold"
                   >
                     Aceitar
                   </button>
 
                   <button
-                    onClick={() => atualizarStatus(convite.id, "recusado")}
+                    onClick={() => atualizarStatus(convite.id, "recusado", convite.projeto_titulo)}
                     className="bg-red-500 text-white px-5 py-3 rounded-lg font-bold"
                   >
                     Recusar
