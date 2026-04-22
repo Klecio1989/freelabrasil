@@ -55,6 +55,13 @@ export default function PainelContratante() {
 
         <div className="flex flex-col gap-4">
           <Link
+            href="/dashboard"
+            className="bg-yellow-400 text-black font-bold px-6 py-3 rounded-lg"
+          >
+            Dashboard
+          </Link>
+
+          <Link
             href="/projetos/novo"
             className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
           >
