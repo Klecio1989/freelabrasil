@@ -2,139 +2,182 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 
 export default function PlanosPage() {
   const [usuario, setUsuario] = useState<any>(null);
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-
     if (usuarioSalvo) {
-      const parsed = JSON.parse(usuarioSalvo);
-      setUsuario(parsed);
+      setUsuario(JSON.parse(usuarioSalvo));
     }
   }, []);
 
-  async function alterarPlano(plano: string) {
-    if (!usuario) {
-      alert("Você precisa estar logado.");
-      return;
+  function badgePlano(plano?: string) {
+    if (plano === "pro") {
+      return (
+        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
+          PRO
+        </span>
+      );
     }
 
-    const { error } = await supabase
-      .from("usuarios")
-      .update({ plano })
-      .eq("id", usuario.id);
-
-    if (error) {
-      alert("Erro ao alterar plano.");
-      return;
+    if (plano === "plus") {
+      return (
+        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
+          PLUS
+        </span>
+      );
     }
 
-    const usuarioAtualizado = { ...usuario, plano };
-    localStorage.setItem(
-      "freelabrasil_usuario",
-      JSON.stringify(usuarioAtualizado)
+    return (
+      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
+        GRATUITO
+      </span>
     );
-    setUsuario(usuarioAtualizado);
-
-    alert(`Plano alterado para ${plano}`);
   }
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-white p-10">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-4xl font-bold">Planos FreelaBrasil</h1>
-            <p className="text-slate-400 mt-2">
-              Escolha o plano ideal para crescer na plataforma
-            </p>
-          </div>
-
-          <Link
-            href="/projetos"
-            className="border border-white/20 px-4 py-2 rounded-lg"
-          >
-            Voltar
-          </Link>
-        </div>
-
-        {usuario && (
-          <div className="mb-8 bg-slate-900 border border-white/10 rounded-xl p-5">
-            <p>
-              Usuário: <b>{usuario.nome}</b>
-            </p>
-            <p>
-              Plano atual: <b>{usuario.plano || "gratuito"}</b>
-            </p>
+  function Card({
+    titulo,
+    preco,
+    destaque,
+    cor,
+    beneficios,
+    botao,
+    href,
+  }: {
+    titulo: string;
+    preco: string;
+    destaque?: string;
+    cor: string;
+    beneficios: string[];
+    botao: string;
+    href: string;
+  }) {
+    return (
+      <div className={`rounded-[2rem] border p-8 ${cor}`}>
+        {destaque && (
+          <div className="inline-block rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-950">
+            {destaque}
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold">Gratuito</h2>
-            <p className="text-4xl font-bold mt-4">R$ 0</p>
+        <h2 className="mt-4 text-3xl font-black">{titulo}</h2>
+        <p className="mt-3 text-5xl font-black">{preco}</p>
+        <p className="mt-2 text-sm text-slate-400">por mês</p>
 
-            <ul className="mt-6 space-y-3 text-slate-300">
-              <li>• Criar perfil</li>
-              <li>• Publicar portfólio</li>
-              <li>• Mostrar 5 projetos</li>
-              <li>• Enviar até 2 ofertas de freela</li>
-              <li>• Depois disso, só recebe mensagens</li>
-            </ul>
+        <div className="mt-8 space-y-3">
+          {beneficios.map((item) => (
+            <div key={item} className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-200">
+              {item}
+            </div>
+          ))}
+        </div>
 
-            <button
-              onClick={() => alterarPlano("gratuito")}
-              className="mt-8 w-full bg-white text-black py-3 rounded-lg font-bold"
-            >
-              Escolher Gratuito
-            </button>
+        <Link
+          href={href}
+          className="mt-8 block rounded-xl bg-white px-6 py-3 text-center font-bold text-slate-950"
+        >
+          {botao}
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-12 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <span className="inline-flex rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-300">
+              Planos FreelaBrasil
+            </span>
+
+            <h1 className="mt-5 text-5xl font-black leading-tight">
+              Escolha o plano ideal para crescer na plataforma
+            </h1>
+
+            <p className="mt-5 text-lg leading-8 text-slate-300">
+              Mais visibilidade, mais convites, mais oportunidades e mais resultado para freelancers e contratantes.
+            </p>
           </div>
 
-          <div className="bg-slate-900 border border-emerald-400 rounded-2xl p-8">
-            <div className="inline-block bg-emerald-400 text-black text-xs font-bold px-3 py-1 rounded-full mb-4">
-              MAIS POPULAR
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+            <div className="text-sm text-slate-400">Seu plano atual</div>
+            <div className="mt-2 flex items-center gap-3 text-xl font-black">
+              <span>{usuario?.plano || "gratuito"}</span>
+              {badgePlano(usuario?.plano)}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card
+            titulo="Gratuito"
+            preco="R$ 0"
+            cor="border-white/10 bg-white/5"
+            beneficios={[
+              "Criar perfil profissional",
+              "Publicar portfólio",
+              "Mostrar até 5 projetos",
+              "Enviar até 2 ofertas de freela",
+              "Receber mensagens de contratantes",
+            ]}
+            botao="Continuar no gratuito"
+            href="/perfil"
+          />
+
+          <Card
+            titulo="Plus"
+            preco="R$ 19,99"
+            destaque="MAIS POPULAR"
+            cor="border-emerald-400/40 bg-emerald-400/5"
+            beneficios={[
+              "Criar perfil completo",
+              "Publicar até 10 projetos",
+              "Mais destaque na plataforma",
+              "Enviar até 10 ofertas por dia",
+              "Receber mensagens e convites",
+            ]}
+            botao="Escolher Plus"
+            href="/perfil"
+          />
+
+          <Card
+            titulo="Pro"
+            preco="R$ 29,99"
+            destaque="MÁXIMO DESTAQUE"
+            cor="border-purple-500/40 bg-purple-500/5"
+            beneficios={[
+              "Criar perfil completo",
+              "Publicar até 30 projetos",
+              "Prioridade máxima na vitrine",
+              "Ofertas ilimitadas",
+              "Mais visibilidade e reputação",
+            ]}
+            botao="Escolher Pro"
+            href="/perfil"
+          />
+        </div>
+
+        <div className="mt-12 rounded-[2rem] border border-white/10 bg-white/5 p-8">
+          <h3 className="text-3xl font-black">O que já está ativo no MVP</h3>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+              <div className="text-sm text-slate-400">Freelancers</div>
+              <div className="mt-2 text-xl font-black">Perfil público, ranking e avaliações</div>
             </div>
 
-            <h2 className="text-2xl font-bold">Plus</h2>
-            <p className="text-4xl font-bold mt-4">R$ 19,99</p>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+              <div className="text-sm text-slate-400">Contratantes</div>
+              <div className="mt-2 text-xl font-black">Projetos, favoritos, convites e propostas</div>
+            </div>
 
-            <ul className="mt-6 space-y-3 text-slate-300">
-              <li>• Criar perfil completo</li>
-              <li>• Publicar 10 projetos</li>
-              <li>• Aparecer com mais destaque</li>
-              <li>• Enviar 10 ofertas por dia</li>
-              <li>• Receber mensagens de contratantes</li>
-            </ul>
-
-            <button
-              onClick={() => alterarPlano("plus")}
-              className="mt-8 w-full bg-emerald-400 text-black py-3 rounded-lg font-bold"
-            >
-              Escolher Plus
-            </button>
-          </div>
-
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold">Pro</h2>
-            <p className="text-4xl font-bold mt-4">R$ 29,99</p>
-
-            <ul className="mt-6 space-y-3 text-slate-300">
-              <li>• Criar perfil completo</li>
-              <li>• Publicar 30 projetos</li>
-              <li>• Aparecer com mais destaque</li>
-              <li>• Enviar ofertas ilimitadas</li>
-              <li>• Receber mensagens de contratantes</li>
-            </ul>
-
-            <button
-              onClick={() => alterarPlano("pro")}
-              className="mt-8 w-full bg-purple-500 text-white py-3 rounded-lg font-bold"
-            >
-              Escolher Pro
-            </button>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+              <div className="text-sm text-slate-400">Plataforma</div>
+              <div className="mt-2 text-xl font-black">Dashboard, notificações e chat</div>
+            </div>
           </div>
         </div>
       </div>
