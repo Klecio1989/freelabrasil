@@ -14,8 +14,12 @@ export default function PerfilPage() {
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [habilidades, setHabilidades] = useState("");
   const [cidade, setCidade] = useState("");
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [desativando, setDesativando] = useState(false);
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
@@ -34,26 +38,14 @@ export default function PerfilPage() {
 
   function badgePlano(plano?: string) {
     if (plano === "pro") {
-      return (
-        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
-          PRO
-        </span>
-      );
+      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
     }
 
     if (plano === "plus") {
-      return (
-        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-          PLUS
-        </span>
-      );
+      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
     }
 
-    return (
-      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
-        GRATUITO
-      </span>
-    );
+    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
   }
 
   function cardDestaque(plano?: string) {
@@ -101,20 +93,48 @@ export default function PerfilPage() {
   async function salvarPerfil() {
     if (!usuario) return;
 
+    if (!nome || !email) {
+      alert("Nome e email são obrigatórios.");
+      return;
+    }
+
+    if (novaSenha || confirmarNovaSenha || senhaAtual) {
+      if (senhaAtual !== usuario.senha) {
+        alert("Senha atual inválida.");
+        return;
+      }
+
+      if (novaSenha.length < 6) {
+        alert("A nova senha deve ter no mínimo 6 caracteres.");
+        return;
+      }
+
+      if (novaSenha !== confirmarNovaSenha) {
+        alert("A confirmação da nova senha não confere.");
+        return;
+      }
+    }
+
     try {
       setSalvando(true);
 
+      const payload: any = {
+        nome,
+        email: email.trim().toLowerCase(),
+        descricao,
+        foto_url: fotoUrl,
+        portfolio_url: portfolioUrl,
+        habilidades,
+        cidade,
+      };
+
+      if (novaSenha) {
+        payload.senha = novaSenha;
+      }
+
       const { error } = await supabase
         .from("usuarios")
-        .update({
-          nome,
-          email,
-          descricao,
-          foto_url: fotoUrl,
-          portfolio_url: portfolioUrl,
-          habilidades,
-          cidade,
-        })
+        .update(payload)
         .eq("id", usuario.id);
 
       if (error) {
@@ -124,17 +144,14 @@ export default function PerfilPage() {
 
       const usuarioAtualizado = {
         ...usuario,
-        nome,
-        email,
-        descricao,
-        foto_url: fotoUrl,
-        portfolio_url: portfolioUrl,
-        habilidades,
-        cidade,
+        ...payload,
       };
 
       localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuarioAtualizado));
       setUsuario(usuarioAtualizado);
+      setSenhaAtual("");
+      setNovaSenha("");
+      setConfirmarNovaSenha("");
       setEditando(false);
       alert("Perfil atualizado com sucesso.");
     } catch (error) {
@@ -142,6 +159,48 @@ export default function PerfilPage() {
       alert("Erro ao salvar perfil.");
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function desativarConta() {
+    if (!usuario) return;
+
+    const confirmar = window.confirm(
+      "Tem certeza que deseja desativar sua conta? Você não conseguirá mais fazer login até reativação manual."
+    );
+
+    if (!confirmar) return;
+
+    const senhaInformada = window.prompt("Digite sua senha atual para confirmar:");
+
+    if (!senhaInformada) return;
+
+    if (senhaInformada !== usuario.senha) {
+      alert("Senha inválida.");
+      return;
+    }
+
+    try {
+      setDesativando(true);
+
+      const { error } = await supabase
+        .from("usuarios")
+        .update({ ativo: false })
+        .eq("id", usuario.id);
+
+      if (error) {
+        alert("Erro ao desativar conta.");
+        return;
+      }
+
+      localStorage.removeItem("freelabrasil_usuario");
+      alert("Conta desativada com sucesso.");
+      window.location.href = "/login";
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao desativar conta.");
+    } finally {
+      setDesativando(false);
     }
   }
 
@@ -261,12 +320,22 @@ export default function PerfilPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => setEditando(true)}
-                    className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
-                  >
-                    Editar perfil
-                  </button>
+                  <div className="flex flex-wrap gap-4">
+                    <button
+                      onClick={() => setEditando(true)}
+                      className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
+                    >
+                      Editar perfil
+                    </button>
+
+                    <button
+                      onClick={desativarConta}
+                      disabled={desativando}
+                      className="bg-red-500 text-white font-bold px-6 py-3 rounded-lg disabled:opacity-60"
+                    >
+                      {desativando ? "Desativando..." : "Desativar conta"}
+                    </button>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-5">
@@ -325,6 +394,34 @@ export default function PerfilPage() {
                     className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
                   />
 
+                  <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
+                    <h3 className="text-lg font-bold">Alterar senha</h3>
+
+                    <input
+                      type="password"
+                      value={senhaAtual}
+                      onChange={(e) => setSenhaAtual(e.target.value)}
+                      placeholder="Senha atual"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
+
+                    <input
+                      type="password"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      placeholder="Nova senha"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
+
+                    <input
+                      type="password"
+                      value={confirmarNovaSenha}
+                      onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                      placeholder="Confirmar nova senha"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
+                  </div>
+
                   <div className="flex gap-4">
                     <button
                       onClick={salvarPerfil}
@@ -335,7 +432,12 @@ export default function PerfilPage() {
                     </button>
 
                     <button
-                      onClick={() => setEditando(false)}
+                      onClick={() => {
+                        setEditando(false);
+                        setSenhaAtual("");
+                        setNovaSenha("");
+                        setConfirmarNovaSenha("");
+                      }}
                       className="border border-white/20 px-6 py-3 rounded-lg"
                     >
                       Cancelar
