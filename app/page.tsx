@@ -2,183 +2,158 @@
 
 import Link from "next/link";
 
-export default function HomePage() {
+export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">FreelaBrasil</h1>
-            <p className="text-sm text-slate-400">Marketplace de freelancers e projetos</p>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5"
-            >
-              Login
-            </Link>
+      {/* HERO */}
+      <section className="px-6 py-24 text-center max-w-5xl mx-auto">
+        <h1 className="text-5xl md:text-6xl font-black leading-tight">
+          Conecte-se com freelancers de alto nível
+        </h1>
 
-            <Link
-              href="/cadastro"
-              className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950 transition hover:scale-[1.02]"
-            >
-              Criar conta
-            </Link>
-          </div>
+        <p className="mt-6 text-lg text-slate-300">
+          Encontre talentos, publique projetos e feche negócios com segurança.
+          Ou seja encontrado pelos melhores clientes do Brasil.
+        </p>
+
+        <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <Link
+            href="/cadastro"
+            className="bg-emerald-400 text-black px-8 py-4 rounded-xl font-bold text-lg"
+          >
+            Começar agora
+          </Link>
+
+          <Link
+            href="/freelancers"
+            className="border border-white/20 px-8 py-4 rounded-xl font-bold text-lg"
+          >
+            Ver freelancers
+          </Link>
         </div>
-      </header>
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-        <div>
-          <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-            Plataforma para contratar e ser contratado
-          </span>
+        <p className="mt-6 text-sm text-slate-500">
+          🚀 Sem taxas ocultas • 💬 Chat direto • ⭐ Ranking por reputação
+        </p>
+      </section>
 
-          <h2 className="mt-6 text-5xl font-black leading-tight md:text-6xl">
-            Conecte projetos reais a freelancers de alto nível.
+      {/* PROVA SOCIAL */}
+      <section className="px-6 py-16 bg-slate-900/50">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl font-bold">
+            Empresas e profissionais já estão usando
           </h2>
 
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            Publique projetos, receba propostas, convide freelancers, avalie resultados e acompanhe tudo em um painel simples e profissional.
-          </p>
-
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="/cadastro"
-              className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950 transition hover:scale-[1.02]"
-            >
-              Começar agora
-            </Link>
-
-            <Link
-              href="/freelancers"
-              className="rounded-xl border border-white/15 px-6 py-3 font-medium text-white transition hover:bg-white/5"
-            >
-              Explorar freelancers
-            </Link>
-
-            <Link
-              href="/projetos"
-              className="rounded-xl border border-white/15 px-6 py-3 font-medium text-white transition hover:bg-white/5"
-            >
-              Ver projetos
-            </Link>
-          </div>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Convites diretos</div>
-              <div className="mt-2 text-2xl font-black">Freelancers</div>
+          <div className="grid md:grid-cols-3 gap-6 mt-10">
+            <div className="p-6 border border-white/10 rounded-xl">
+              <p className="text-slate-300">
+                “Encontrei um dev em 24h e já estamos no terceiro projeto juntos.”
+              </p>
+              <p className="mt-4 font-bold">— Lucas, Startup SaaS</p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Propostas</div>
-              <div className="mt-2 text-2xl font-black">Em minutos</div>
+            <div className="p-6 border border-white/10 rounded-xl">
+              <p className="text-slate-300">
+                “Recebi 5 propostas no primeiro dia. Plataforma absurda.”
+              </p>
+              <p className="mt-4 font-bold">— Mariana, E-commerce</p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Planos</div>
-              <div className="mt-2 text-2xl font-black">Free / Plus / Pro</div>
+            <div className="p-6 border border-white/10 rounded-xl">
+              <p className="text-slate-300">
+                “Hoje vivo 100% de freelas aqui dentro.”
+              </p>
+              <p className="mt-4 font-bold">— Rafael, Freelancer</p>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl">
-          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5">
-            <div className="text-sm text-emerald-300">Para contratantes</div>
-            <div className="mt-2 text-2xl font-black">Publique projetos e receba talentos qualificados</div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Busque freelancers, favorite perfis, envie convites e acompanhe métricas no dashboard.
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-purple-500/20 bg-purple-500/10 p-5">
-            <div className="text-sm text-purple-300">Para freelancers</div>
-            <div className="mt-2 text-2xl font-black">Construa reputação e feche mais trabalhos</div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Tenha perfil público, portfólio, avaliações, ranking, notificações e convites diretos.
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-            <div className="text-sm text-slate-400">Recursos ativos</div>
-            <ul className="mt-3 space-y-3 text-sm text-slate-200">
-              <li>• Login e cadastro</li>
-              <li>• Publicação de projetos</li>
-              <li>• Envio e aceite de propostas</li>
-              <li>• Chat por proposta</li>
-              <li>• Perfil público com avaliações</li>
-              <li>• Favoritos, convites e notificações</li>
-              <li>• Planos e dashboard</li>
-            </ul>
           </div>
         </div>
       </section>
 
-      <section className="border-t border-white/10 bg-slate-950">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <div className="mb-10 text-center">
-            <h3 className="text-4xl font-black">Como funciona</h3>
-            <p className="mt-3 text-slate-400">
-              Fluxo simples para gerar negócios reais
-            </p>
-          </div>
+      {/* BENEFÍCIOS */}
+      <section className="px-6 py-20">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-black text-center">
+            Por que usar a FreelaBrasil?
+          </h2>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
-              <div className="text-sm font-semibold text-emerald-300">01</div>
-              <h4 className="mt-3 text-2xl font-black">Crie sua conta</h4>
-              <p className="mt-3 text-slate-300">
-                Cadastre-se como freelancer ou contratante e personalize seu perfil.
+          <div className="grid md:grid-cols-3 gap-6 mt-12">
+            <div className="p-6 border border-white/10 rounded-xl">
+              <h3 className="text-xl font-bold">Ranking inteligente</h3>
+              <p className="text-slate-400 mt-3">
+                Freelancers são ranqueados por reputação, entrega e desempenho.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
-              <div className="text-sm font-semibold text-emerald-300">02</div>
-              <h4 className="mt-3 text-2xl font-black">Conecte-se</h4>
-              <p className="mt-3 text-slate-300">
-                Publique projetos, envie propostas, favorite perfis e faça convites diretos.
+            <div className="p-6 border border-white/10 rounded-xl">
+              <h3 className="text-xl font-bold">Convites diretos</h3>
+              <p className="text-slate-400 mt-3">
+                Contratantes podem chamar freelancers sem esperar proposta.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-7">
-              <div className="text-sm font-semibold text-emerald-300">03</div>
-              <h4 className="mt-3 text-2xl font-black">Feche negócios</h4>
-              <p className="mt-3 text-slate-300">
-                Converse no chat, aceite propostas, entregue valor e construa reputação.
+            <div className="p-6 border border-white/10 rounded-xl">
+              <h3 className="text-xl font-bold">Chat integrado</h3>
+              <p className="text-slate-400 mt-3">
+                Negocie tudo dentro da plataforma, sem sair.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="border-t border-white/10 bg-slate-950">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-r from-emerald-400/15 to-purple-500/15 p-10 text-center">
-            <h3 className="text-4xl font-black">Pronto para crescer com a FreelaBrasil?</h3>
-            <p className="mx-auto mt-4 max-w-2xl text-slate-300">
-              Comece no plano gratuito ou evolua para Plus e Pro para ganhar mais destaque e oportunidades.
-            </p>
+      {/* PLANOS */}
+      <section className="px-6 py-20 bg-slate-900/50">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-4xl font-black">
+            Planos para crescer mais rápido
+          </h2>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <Link
-                href="/cadastro"
-                className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
-              >
-                Criar conta grátis
-              </Link>
+          <div className="grid md:grid-cols-3 gap-6 mt-12">
+            <div className="p-6 border border-white/10 rounded-xl">
+              <h3 className="text-xl font-bold">Gratuito</h3>
+              <p className="mt-2 text-slate-400">Comece sem pagar nada</p>
+              <p className="text-3xl font-black mt-4">R$ 0</p>
+            </div>
 
-              <Link
-                href="/planos"
-                className="rounded-xl border border-white/15 px-6 py-3 font-medium text-white"
-              >
-                Ver planos
-              </Link>
+            <div className="p-6 border border-emerald-400 rounded-xl">
+              <h3 className="text-xl font-bold">Plus</h3>
+              <p className="mt-2 text-slate-400">Mais visibilidade</p>
+              <p className="text-3xl font-black mt-4">R$ 19,99</p>
+            </div>
+
+            <div className="p-6 border border-purple-500 rounded-xl">
+              <h3 className="text-xl font-bold">Pro</h3>
+              <p className="mt-2 text-slate-400">Máximo destaque</p>
+              <p className="text-3xl font-black mt-4">R$ 29,99</p>
             </div>
           </div>
+
+          <Link
+            href="/planos"
+            className="inline-block mt-10 bg-white text-black px-8 py-4 rounded-xl font-bold"
+          >
+            Ver todos os planos
+          </Link>
         </div>
+      </section>
+
+      {/* CTA FINAL */}
+      <section className="px-6 py-24 text-center">
+        <h2 className="text-4xl font-black">
+          Pronto para começar?
+        </h2>
+
+        <p className="text-slate-400 mt-4">
+          Crie sua conta e comece a gerar renda ou contratar hoje.
+        </p>
+
+        <Link
+          href="/cadastro"
+          className="mt-8 inline-block bg-emerald-400 text-black px-10 py-5 rounded-xl font-bold text-lg"
+        >
+          Criar conta grátis
+        </Link>
       </section>
     </main>
   );
