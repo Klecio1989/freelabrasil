@@ -14,6 +14,7 @@ type Freelancer = {
   plano?: string;
   nota_media?: number;
   projetos_concluidos?: number;
+  score_reputacao?: number;
 };
 
 type Projeto = {
@@ -46,43 +47,26 @@ export default function FreelancersPage() {
       }
     }
 
-    carregarFreelancers();
+    inicializar();
   }, []);
+
+  async function inicializar() {
+    await fetch("/api/recalcular-ranking", { method: "POST" });
+    await carregarFreelancers();
+  }
 
   async function carregarFreelancers() {
     const { data } = await supabase
       .from("usuarios")
       .select(
-        "id,nome,cidade,foto_url,descricao,habilidades,plano,nota_media,projetos_concluidos,tipo_usuario"
+        "id,nome,cidade,foto_url,descricao,habilidades,plano,nota_media,projetos_concluidos,score_reputacao,tipo_usuario"
       )
-      .eq("tipo_usuario", "freelancer");
+      .eq("tipo_usuario", "freelancer")
+      .order("score_reputacao", { ascending: false });
 
     if (!data) return;
 
-    const prioridadePlano: Record<string, number> = {
-      pro: 0,
-      plus: 1,
-      gratuito: 2,
-    };
-
-    const ordenados = [...data].sort((a: any, b: any) => {
-      const prioridadeA = prioridadePlano[a.plano || "gratuito"];
-      const prioridadeB = prioridadePlano[b.plano || "gratuito"];
-
-      if (prioridadeA !== prioridadeB) return prioridadeA - prioridadeB;
-
-      const notaA = Number(a.nota_media || 0);
-      const notaB = Number(b.nota_media || 0);
-
-      if (notaA !== notaB) return notaB - notaA;
-
-      const concluidosA = Number(a.projetos_concluidos || 0);
-      const concluidosB = Number(b.projetos_concluidos || 0);
-
-      return concluidosB - concluidosA;
-    });
-
-    setFreelancers(ordenados as Freelancer[]);
+    setFreelancers(data as Freelancer[]);
   }
 
   async function carregarFavoritos(contratanteId: string) {
@@ -92,7 +76,6 @@ export default function FreelancersPage() {
       .eq("contratante_id", contratanteId);
 
     if (!data) return;
-
     setFavoritos(data.map((item: any) => item.freelancer_id));
   }
 
@@ -163,6 +146,16 @@ export default function FreelancersPage() {
       return;
     }
 
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: freelancerSelecionado,
+        titulo: "Novo convite recebido",
+        descricao: "Você recebeu um novo convite para projeto.",
+        lida: false,
+        link: "/convites",
+      },
+    ]);
+
     alert("Convite enviado com sucesso.");
     setAbrirConvite(false);
   }
@@ -185,26 +178,14 @@ export default function FreelancersPage() {
 
   function badgePlano(plano?: string) {
     if (plano === "pro") {
-      return (
-        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
-          PRO
-        </span>
-      );
+      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
     }
 
     if (plano === "plus") {
-      return (
-        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-          PLUS
-        </span>
-      );
+      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
     }
 
-    return (
-      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
-        GRATUITO
-      </span>
-    );
+    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
   }
 
   function cardDestaque(plano?: string) {
@@ -227,7 +208,7 @@ export default function FreelancersPage() {
             </h1>
 
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              Descubra profissionais com ranking, avaliações, portfólio e destaque por plano.
+              Ranking com reputação automática, avaliações, projetos concluídos e destaque por plano.
             </p>
           </div>
 
@@ -238,13 +219,13 @@ export default function FreelancersPage() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Prioridade</div>
-              <div className="mt-1 text-2xl font-black">Pro / Plus</div>
+              <div className="text-sm text-slate-400">Ranking</div>
+              <div className="mt-1 text-2xl font-black">Automático</div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Busca</div>
-              <div className="mt-1 text-2xl font-black">Ativa</div>
+              <div className="text-sm text-slate-400">Prioridade</div>
+              <div className="mt-1 text-2xl font-black">Pro / Plus</div>
             </div>
           </div>
         </div>
@@ -318,6 +299,9 @@ export default function FreelancersPage() {
                       <span className="text-sm text-slate-400">#{index + 1}</span>
                       <h2 className="text-2xl font-black">{f.nome}</h2>
                       {badgePlano(f.plano)}
+                      <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                        SCORE {Number(f.score_reputacao || 0).toFixed(0)}
+                      </span>
                     </div>
 
                     <p className="mt-2 text-slate-400">{f.cidade || "-"}</p>
