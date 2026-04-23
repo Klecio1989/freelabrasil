@@ -17,22 +17,40 @@ export default function NovoProjetoPage() {
   const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
-    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+    async function carregarUsuarioAtual() {
+      const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
-    if (!usuarioSalvo) {
-      router.push("/login");
-      return;
+      if (!usuarioSalvo) {
+        router.push("/login");
+        return;
+      }
+
+      const parsed = JSON.parse(usuarioSalvo);
+
+      if (parsed.tipo_usuario !== "contratante") {
+        alert("Apenas contratantes podem publicar projetos.");
+        router.push("/projetos");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("email", parsed.email)
+        .maybeSingle();
+
+      if (error || !data) {
+        alert("Usuário não encontrado. Faça login novamente.");
+        localStorage.removeItem("freelabrasil_usuario");
+        router.push("/login");
+        return;
+      }
+
+      localStorage.setItem("freelabrasil_usuario", JSON.stringify(data));
+      setUsuario(data);
     }
 
-    const parsed = JSON.parse(usuarioSalvo);
-
-    if (parsed.tipo_usuario !== "contratante") {
-      alert("Apenas contratantes podem publicar projetos.");
-      router.push("/projetos");
-      return;
-    }
-
-    setUsuario(parsed);
+    carregarUsuarioAtual();
   }, [router]);
 
   async function publicarProjeto() {
@@ -78,20 +96,16 @@ export default function NovoProjetoPage() {
 
       const novoTotalProjetos = Number(usuario.projetos_publicados || 0) + 1;
 
-      const { error: updateUserError } = await supabase
+      const { data: usuarioAtualizado, error: updateUserError } = await supabase
         .from("usuarios")
         .update({
           projetos_publicados: novoTotalProjetos,
         })
-        .eq("id", usuario.id);
+        .eq("id", usuario.id)
+        .select()
+        .single();
 
-      if (updateUserError) {
-        console.error("ERRO AO ATUALIZAR USUÁRIO:", updateUserError);
-      } else {
-        const usuarioAtualizado = {
-          ...usuario,
-          projetos_publicados: novoTotalProjetos,
-        };
+      if (!updateUserError && usuarioAtualizado) {
         localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuarioAtualizado));
       }
 
