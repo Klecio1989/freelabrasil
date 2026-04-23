@@ -11,6 +11,7 @@ type Notificacao = {
   lida: boolean;
   link?: string;
   created_at: string;
+  usuario_id: string;
 };
 
 export default function NotificacoesPage() {
@@ -19,11 +20,47 @@ export default function NotificacoesPage() {
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (usuarioSalvo) {
-      const parsed = JSON.parse(usuarioSalvo);
-      setUsuario(parsed);
-      carregarNotificacoes(parsed.id);
-    }
+    if (!usuarioSalvo) return;
+
+    const parsed = JSON.parse(usuarioSalvo);
+    setUsuario(parsed);
+    carregarNotificacoes(parsed.id);
+
+    const channel = supabase
+      .channel(`notificacoes-${parsed.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notificacoes",
+          filter: `usuario_id=eq.${parsed.id}`,
+        },
+        (payload) => {
+          const nova = payload.new as Notificacao;
+          setNotificacoes((prev) => [nova, ...prev]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notificacoes",
+          filter: `usuario_id=eq.${parsed.id}`,
+        },
+        (payload) => {
+          const atualizada = payload.new as Notificacao;
+          setNotificacoes((prev) =>
+            prev.map((n) => (n.id === atualizada.id ? atualizada : n))
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function carregarNotificacoes(usuarioId: string) {
@@ -47,21 +84,65 @@ export default function NotificacoesPage() {
     );
   }
 
+  async function marcarTodasComoLidas() {
+    if (!usuario) return;
+
+    await supabase
+      .from("notificacoes")
+      .update({ lida: true })
+      .eq("usuario_id", usuario.id)
+      .eq("lida", false);
+
+    setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
+  }
+
+  const naoLidas = notificacoes.filter((n) => !n.lida).length;
+
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
+        <div className="flex items-center justify-between mb-10 gap-4 flex-wrap">
           <div>
             <h1 className="text-4xl font-bold">Notificações</h1>
-            <p className="text-slate-400 mt-2">Acompanhe atualizações da plataforma</p>
+            <p className="text-slate-400 mt-2">
+              Acompanhe atualizações da plataforma em tempo real
+            </p>
           </div>
 
-          <Link
-            href="/projetos"
-            className="border border-white/20 px-4 py-2 rounded-lg"
-          >
-            Voltar
-          </Link>
+          <div className="flex gap-3">
+            {naoLidas > 0 && (
+              <button
+                onClick={marcarTodasComoLidas}
+                className="bg-white text-black px-4 py-2 rounded-lg font-bold"
+              >
+                Marcar todas como lidas
+              </button>
+            )}
+
+            <Link
+              href="/dashboard"
+              className="border border-white/20 px-4 py-2 rounded-lg"
+            >
+              Voltar
+            </Link>
+          </div>
+        </div>
+
+        <div className="mb-6 grid md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-slate-400">Total</div>
+            <div className="mt-2 text-2xl font-black">{notificacoes.length}</div>
+          </div>
+
+          <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-5">
+            <div className="text-sm text-slate-400">Não lidas</div>
+            <div className="mt-2 text-2xl font-black">{naoLidas}</div>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5">
+            <div className="text-sm text-slate-400">Tempo real</div>
+            <div className="mt-2 text-2xl font-black">Ativo</div>
+          </div>
         </div>
 
         <div className="grid gap-6">
