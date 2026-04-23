@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+import { Paperclip } from "lucide-react";
 
 type Mensagem = {
   id: string;
@@ -39,7 +40,7 @@ export default function ChatClient({ propostaId }: Props) {
     carregarMensagens();
 
     const channel = supabase
-      .channel(`chat-mensagens-${propostaId}`)
+      .channel(`chat-${propostaId}`)
       .on(
         "postgres_changes",
         {
@@ -49,11 +50,7 @@ export default function ChatClient({ propostaId }: Props) {
           filter: `proposta_id=eq.${propostaId}`,
         },
         (payload) => {
-          setMensagens((prev) => {
-            const existe = prev.some((m) => m.id === (payload.new as Mensagem).id);
-            if (existe) return prev;
-            return [...prev, payload.new as Mensagem];
-          });
+          setMensagens((prev) => [...prev, payload.new as Mensagem]);
         }
       )
       .subscribe();
@@ -79,15 +76,8 @@ export default function ChatClient({ propostaId }: Props) {
     if (data) setMensagens(data as Mensagem[]);
   }
 
-  function limparFormulario() {
-    setNovaMensagem("");
-    setArquivo(null);
-    const input = document.getElementById("arquivo-chat") as HTMLInputElement | null;
-    if (input) input.value = "";
-  }
-
   async function enviarMensagem() {
-    if ((!novaMensagem.trim() && !arquivo) || !usuarioId || !propostaId) return;
+    if ((!novaMensagem.trim() && !arquivo) || !usuarioId) return;
 
     try {
       setEnviando(true);
@@ -95,18 +85,16 @@ export default function ChatClient({ propostaId }: Props) {
       let arquivoUrl: string | null = null;
       let arquivoNome: string | null = null;
 
+      // 🚀 upload
       if (arquivo) {
-        const extensao = arquivo.name.split(".").pop();
-        const nomeArquivo = `${propostaId}/${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.${extensao}`;
+        const nomeArquivo = `${Date.now()}-${arquivo.name}`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error } = await supabase.storage
           .from("chat-arquivos")
-          .upload(nomeArquivo, arquivo, { upsert: false });
+          .upload(nomeArquivo, arquivo);
 
-        if (uploadError) {
-          alert("Erro ao enviar arquivo.");
+        if (error) {
+          alert("Erro ao enviar arquivo");
           return;
         }
 
@@ -118,22 +106,27 @@ export default function ChatClient({ propostaId }: Props) {
         arquivoNome = arquivo.name;
       }
 
-      const payload = {
-        mensagem: novaMensagem.trim(),
-        remetente_id: usuarioId,
-        proposta_id: propostaId,
-        arquivo_url: arquivoUrl,
-        arquivo_nome: arquivoNome,
-      };
-
-      const { error } = await supabase.from("mensagens").insert([payload]);
+      const { error } = await supabase.from("mensagens").insert([
+        {
+          mensagem: novaMensagem,
+          remetente_id: usuarioId,
+          proposta_id: propostaId,
+          arquivo_url: arquivoUrl,
+          arquivo_nome: arquivoNome,
+        },
+      ]);
 
       if (error) {
-        alert("Erro ao enviar mensagem.");
+        alert("Erro ao enviar mensagem");
         return;
       }
 
-      limparFormulario();
+      setNovaMensagem("");
+      setArquivo(null);
+
+      const input = document.getElementById("arquivo-chat") as HTMLInputElement;
+      if (input) input.value = "";
+
     } finally {
       setEnviando(false);
     }
@@ -142,29 +135,24 @@ export default function ChatClient({ propostaId }: Props) {
   function renderArquivo(m: Mensagem) {
     if (!m.arquivo_url) return null;
 
-    const nome = m.arquivo_nome || "Arquivo anexado";
+    const nome = m.arquivo_nome || "Arquivo";
     const ext = nome.split(".").pop()?.toLowerCase();
 
-    const isImage = ["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "");
+    const isImage = ["png", "jpg", "jpeg", "webp"].includes(ext || "");
 
     return (
-      <div className="mt-3">
+      <div className="mt-2">
         {isImage && (
-          <a href={m.arquivo_url} target="_blank">
-            <img
-              src={m.arquivo_url}
-              alt={nome}
-              className="max-w-[220px] rounded-lg border border-black/10"
-            />
-          </a>
+          <img
+            src={m.arquivo_url}
+            className="max-w-[200px] rounded-lg mb-2"
+          />
         )}
 
         <a
           href={m.arquivo_url}
           target="_blank"
-          className={`mt-2 inline-block text-sm underline ${
-            m.remetente_id === usuarioId ? "text-black" : "text-emerald-300"
-          }`}
+          className="text-sm underline"
         >
           📎 {nome}
         </a>
@@ -173,75 +161,78 @@ export default function ChatClient({ propostaId }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-10">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Chat da proposta</h1>
+    <main className="min-h-screen bg-slate-950 text-white p-6">
+      <div className="max-w-3xl mx-auto">
 
-        <Link
-          href="/minhas-propostas"
-          className="rounded-lg border border-white/20 px-4 py-2"
+        <div className="flex justify-between mb-6">
+          <h1 className="text-2xl font-bold">Chat</h1>
+
+          <Link href="/dashboard" className="border px-3 py-1 rounded">
+            Voltar
+          </Link>
+        </div>
+
+        {/* mensagens */}
+        <div
+          ref={mensagensRef}
+          className="bg-slate-900 p-4 rounded h-[400px] overflow-y-auto space-y-3"
         >
-          Voltar
-        </Link>
-      </div>
+          {mensagens.map((m) => (
+            <div
+              key={m.id}
+              className={`p-3 rounded max-w-[70%] ${
+                m.remetente_id === usuarioId
+                  ? "bg-emerald-400 text-black ml-auto"
+                  : "bg-slate-700"
+              }`}
+            >
+              {m.mensagem}
+              {renderArquivo(m)}
+            </div>
+          ))}
+        </div>
 
-      <div
-        ref={mensagensRef}
-        className="bg-slate-900 border border-white/10 rounded-xl p-6 h-[450px] overflow-y-auto space-y-4"
-      >
-        {mensagens.length === 0 && (
-          <div className="text-slate-400 text-center mt-20">
-            Nenhuma mensagem ainda.
-          </div>
-        )}
+        {/* envio */}
+        <div className="mt-4 space-y-3">
 
-        {mensagens.map((m) => (
-          <div
-            key={m.id}
-            className={`p-4 rounded-xl max-w-[75%] ${
-              m.remetente_id === usuarioId
-                ? "bg-emerald-400 text-black ml-auto"
-                : "bg-slate-700 text-white"
-            }`}
-          >
-            {m.mensagem && <div>{m.mensagem}</div>}
-            {renderArquivo(m)}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 rounded-xl border border-white/10 bg-slate-900 p-4">
-        <div className="flex flex-col gap-4">
           <textarea
-            className="w-full rounded-lg bg-slate-800 p-3 outline-none"
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
-            placeholder="Digite sua mensagem"
-            rows={4}
+            className="w-full p-3 rounded bg-slate-800"
+            placeholder="Digite uma mensagem"
           />
 
-          <input
-            id="arquivo-chat"
-            type="file"
-            onChange={(e) => setArquivo(e.target.files?.[0] || null)}
-            className="block w-full text-sm text-slate-300"
-          />
-
-          {arquivo && (
-            <div className="text-sm text-slate-400">
-              Arquivo selecionado: {arquivo.name}
-            </div>
-          )}
-
-          <div className="flex gap-4">
-            <button
-              onClick={enviarMensagem}
-              disabled={enviando}
-              className="bg-emerald-400 text-black px-6 py-3 rounded font-bold disabled:opacity-60"
+          {/* 🔥 CLIP BONITO */}
+          <div className="flex items-center gap-3">
+            <label
+              htmlFor="arquivo-chat"
+              className="cursor-pointer flex items-center justify-center w-12 h-12 rounded-xl border border-white/10 bg-slate-800 hover:bg-slate-700 transition"
             >
-              {enviando ? "Enviando..." : "Enviar"}
-            </button>
+              <Paperclip size={20} />
+            </label>
+
+            <input
+              id="arquivo-chat"
+              type="file"
+              onChange={(e) => setArquivo(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+
+            {arquivo && (
+              <span className="text-sm text-slate-400">
+                {arquivo.name}
+              </span>
+            )}
           </div>
+
+          <button
+            onClick={enviarMensagem}
+            disabled={enviando}
+            className="bg-emerald-400 text-black px-6 py-2 rounded font-bold"
+          >
+            {enviando ? "Enviando..." : "Enviar"}
+          </button>
+
         </div>
       </div>
     </main>
