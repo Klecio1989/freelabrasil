@@ -76,8 +76,16 @@ export default function ChatClient({ propostaId }: Props) {
     if (data) setMensagens(data as Mensagem[]);
   }
 
+  function limparNomeArquivo(nome: string) {
+    return nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9.\-_]/g, "-")
+      .toLowerCase();
+  }
+
   async function enviarMensagem() {
-    if ((!novaMensagem.trim() && !arquivo) || !usuarioId) return;
+    if ((!novaMensagem.trim() && !arquivo) || !usuarioId || !propostaId) return;
 
     try {
       setEnviando(true);
@@ -85,16 +93,20 @@ export default function ChatClient({ propostaId }: Props) {
       let arquivoUrl: string | null = null;
       let arquivoNome: string | null = null;
 
-      // 🚀 upload
       if (arquivo) {
-        const nomeArquivo = `${Date.now()}-${arquivo.name}`;
+        const nomeLimpo = limparNomeArquivo(arquivo.name);
+        const nomeArquivo = `${propostaId}/${Date.now()}-${nomeLimpo}`;
 
-        const { error } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("chat-arquivos")
-          .upload(nomeArquivo, arquivo);
+          .upload(nomeArquivo, arquivo, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-        if (error) {
-          alert("Erro ao enviar arquivo");
+        if (uploadError) {
+          console.error("ERRO UPLOAD STORAGE:", uploadError);
+          alert(uploadError.message || "Erro ao enviar arquivo");
           return;
         }
 
@@ -108,7 +120,7 @@ export default function ChatClient({ propostaId }: Props) {
 
       const { error } = await supabase.from("mensagens").insert([
         {
-          mensagem: novaMensagem,
+          mensagem: novaMensagem.trim(),
           remetente_id: usuarioId,
           proposta_id: propostaId,
           arquivo_url: arquivoUrl,
@@ -117,7 +129,8 @@ export default function ChatClient({ propostaId }: Props) {
       ]);
 
       if (error) {
-        alert("Erro ao enviar mensagem");
+        console.error("ERRO INSERT MENSAGEM:", error);
+        alert(error.message || "Erro ao enviar mensagem");
         return;
       }
 
@@ -126,7 +139,6 @@ export default function ChatClient({ propostaId }: Props) {
 
       const input = document.getElementById("arquivo-chat") as HTMLInputElement;
       if (input) input.value = "";
-
     } finally {
       setEnviando(false);
     }
@@ -137,23 +149,21 @@ export default function ChatClient({ propostaId }: Props) {
 
     const nome = m.arquivo_nome || "Arquivo";
     const ext = nome.split(".").pop()?.toLowerCase();
-
-    const isImage = ["png", "jpg", "jpeg", "webp"].includes(ext || "");
+    const isImage = ["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "");
 
     return (
       <div className="mt-2">
         {isImage && (
-          <img
-            src={m.arquivo_url}
-            className="max-w-[200px] rounded-lg mb-2"
-          />
+          <a href={m.arquivo_url} target="_blank">
+            <img
+              src={m.arquivo_url}
+              alt={nome}
+              className="max-w-[220px] rounded-lg mb-2 border border-white/10"
+            />
+          </a>
         )}
 
-        <a
-          href={m.arquivo_url}
-          target="_blank"
-          className="text-sm underline"
-        >
+        <a href={m.arquivo_url} target="_blank" className="text-sm underline">
           📎 {nome}
         </a>
       </div>
@@ -163,52 +173,55 @@ export default function ChatClient({ propostaId }: Props) {
   return (
     <main className="min-h-screen bg-slate-950 text-white p-6">
       <div className="max-w-3xl mx-auto">
-
         <div className="flex justify-between mb-6">
           <h1 className="text-2xl font-bold">Chat</h1>
 
-          <Link href="/dashboard" className="border px-3 py-1 rounded">
+          <Link href="/dashboard" className="border border-white/20 px-3 py-1 rounded">
             Voltar
           </Link>
         </div>
 
-        {/* mensagens */}
         <div
           ref={mensagensRef}
-          className="bg-slate-900 p-4 rounded h-[400px] overflow-y-auto space-y-3"
+          className="bg-slate-900 p-4 rounded-xl h-[400px] overflow-y-auto space-y-3 border border-white/10"
         >
+          {mensagens.length === 0 && (
+            <div className="text-slate-400 text-center mt-20">
+              Nenhuma mensagem ainda.
+            </div>
+          )}
+
           {mensagens.map((m) => (
             <div
               key={m.id}
-              className={`p-3 rounded max-w-[70%] ${
+              className={`p-3 rounded-xl max-w-[70%] ${
                 m.remetente_id === usuarioId
                   ? "bg-emerald-400 text-black ml-auto"
-                  : "bg-slate-700"
+                  : "bg-slate-700 text-white"
               }`}
             >
-              {m.mensagem}
+              {m.mensagem && <div>{m.mensagem}</div>}
               {renderArquivo(m)}
             </div>
           ))}
         </div>
 
-        {/* envio */}
         <div className="mt-4 space-y-3">
-
           <textarea
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
-            className="w-full p-3 rounded bg-slate-800"
+            className="w-full p-3 rounded-xl bg-slate-800 border border-white/10 outline-none"
             placeholder="Digite uma mensagem"
+            rows={4}
           />
 
-          {/* 🔥 CLIP BONITO */}
           <div className="flex items-center gap-3">
             <label
               htmlFor="arquivo-chat"
               className="cursor-pointer flex items-center justify-center w-12 h-12 rounded-xl border border-white/10 bg-slate-800 hover:bg-slate-700 transition"
+              title="Anexar arquivo"
             >
-              <Paperclip size={20} />
+              <Paperclip size={22} />
             </label>
 
             <input
@@ -219,7 +232,7 @@ export default function ChatClient({ propostaId }: Props) {
             />
 
             {arquivo && (
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-slate-400 truncate max-w-[260px]">
                 {arquivo.name}
               </span>
             )}
@@ -228,11 +241,10 @@ export default function ChatClient({ propostaId }: Props) {
           <button
             onClick={enviarMensagem}
             disabled={enviando}
-            className="bg-emerald-400 text-black px-6 py-2 rounded font-bold"
+            className="bg-emerald-400 text-black px-6 py-3 rounded-xl font-bold disabled:opacity-60"
           >
             {enviando ? "Enviando..." : "Enviar"}
           </button>
-
         </div>
       </div>
     </main>
