@@ -24,15 +24,16 @@ export default function ChatClient({ propostaId }: Props) {
   const [novaMensagem, setNovaMensagem] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [usuarioId, setUsuarioId] = useState("");
+  const [destinatarioId, setDestinatarioId] = useState("");
   const [enviando, setEnviando] = useState(false);
   const mensagensRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const usuario = localStorage.getItem("freelabrasil_usuario");
-
     if (usuario) {
       const parsed = JSON.parse(usuario);
       setUsuarioId(parsed.id);
+      carregarDestinatario(parsed.id);
     }
 
     if (!propostaId) return;
@@ -65,6 +66,30 @@ export default function ChatClient({ propostaId }: Props) {
       mensagensRef.current.scrollTop = mensagensRef.current.scrollHeight;
     }
   }, [mensagens]);
+
+  async function carregarDestinatario(remetenteAtualId: string) {
+    const { data: proposta } = await supabase
+      .from("propostas")
+      .select("id,freelancer_id,projeto_id")
+      .eq("id", propostaId)
+      .single();
+
+    if (!proposta) return;
+
+    const { data: projeto } = await supabase
+      .from("projetos")
+      .select("id,contratante_id")
+      .eq("id", proposta.projeto_id)
+      .single();
+
+    if (!projeto) return;
+
+    if (remetenteAtualId === proposta.freelancer_id) {
+      setDestinatarioId(projeto.contratante_id);
+    } else {
+      setDestinatarioId(proposta.freelancer_id);
+    }
+  }
 
   async function carregarMensagens() {
     const { data } = await supabase
@@ -105,7 +130,6 @@ export default function ChatClient({ propostaId }: Props) {
           });
 
         if (uploadError) {
-          console.error("ERRO UPLOAD STORAGE:", uploadError);
           alert(uploadError.message || "Erro ao enviar arquivo");
           return;
         }
@@ -129,9 +153,22 @@ export default function ChatClient({ propostaId }: Props) {
       ]);
 
       if (error) {
-        console.error("ERRO INSERT MENSAGEM:", error);
         alert(error.message || "Erro ao enviar mensagem");
         return;
+      }
+
+      if (destinatarioId) {
+        await supabase.from("notificacoes").insert([
+          {
+            usuario_id: destinatarioId,
+            titulo: "Nova mensagem no chat",
+            descricao: arquivoNome
+              ? `Você recebeu uma nova mensagem com anexo: ${arquivoNome}`
+              : "Você recebeu uma nova mensagem.",
+            lida: false,
+            link: `/chat?proposta_id=${propostaId}`,
+          },
+        ]);
       }
 
       setNovaMensagem("");
