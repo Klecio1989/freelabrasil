@@ -12,8 +12,8 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
 
-  function validarEmail(email: string) {
-    return /\S+@\S+\.\S+/.test(email);
+  function validarEmail(valor: string) {
+    return /\S+@\S+\.\S+/.test(valor);
   }
 
   async function entrar() {
@@ -30,6 +30,8 @@ export default function LoginPage() {
     try {
       setCarregando(true);
 
+      localStorage.removeItem("freelabrasil_usuario");
+
       const emailNormalizado = email.trim().toLowerCase();
 
       const { data: usuario, error } = await supabase
@@ -40,11 +42,11 @@ export default function LoginPage() {
         .maybeSingle();
 
       if (error || !usuario) {
-        alert("Usuário ou senha inválidos");
+        alert("Usuário ou senha inválidos.");
         return;
       }
 
-      if (!usuario.ativo) {
+      if (usuario.ativo === false) {
         alert("Sua conta está desativada. Solicite reativação ao suporte.");
         return;
       }
@@ -53,11 +55,17 @@ export default function LoginPage() {
 
       if (usuario.tipo_usuario === "freelancer") {
         router.push("/painel-freelancer");
-      } else {
-        router.push("/painel-contratante");
+        return;
       }
+
+      if (usuario.tipo_usuario === "contratante") {
+        router.push("/painel-contratante");
+        return;
+      }
+
+      router.push("/dashboard");
     } catch (error) {
-      console.error(error);
+      console.error("ERRO LOGIN:", error);
       alert("Erro ao fazer login.");
     } finally {
       setCarregando(false);
@@ -79,23 +87,6 @@ export default function LoginPage() {
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
             Acompanhe projetos, propostas, convites, favoritos, notificações e desempenho da sua conta em um só lugar.
           </p>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Freelancers</div>
-              <div className="mt-2 text-xl font-black">Propostas e convites</div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Contratantes</div>
-              <div className="mt-2 text-xl font-black">Projetos e favoritos</div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-slate-400">Conta</div>
-              <div className="mt-2 text-xl font-black">Perfil e planos</div>
-            </div>
-          </div>
         </div>
 
         <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl">
@@ -133,7 +124,7 @@ export default function LoginPage() {
             <button
               onClick={entrar}
               disabled={carregando}
-              className="w-full rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950 transition hover:scale-[1.02] disabled:opacity-60"
+              className="w-full rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950 disabled:opacity-60"
             >
               {carregando ? "Entrando..." : "Entrar"}
             </button>
@@ -148,21 +139,8 @@ export default function LoginPage() {
 
               <p>
                 Esqueceu sua senha?{" "}
-                <Link
-                  href="/esqueci-senha"
-                  className="font-semibold text-yellow-300"
-                >
+                <Link href="/esqueci-senha" className="font-semibold text-yellow-300">
                   Redefinir senha
-                </Link>
-              </p>
-
-              <p>
-                Conta desativada?{" "}
-                <Link
-                  href="/admin/reactivar"
-                  className="font-semibold text-yellow-300"
-                >
-                  Reativar conta
                 </Link>
               </p>
             </div>
