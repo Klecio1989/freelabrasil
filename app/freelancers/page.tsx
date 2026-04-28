@@ -142,7 +142,8 @@ export default function FreelancersPage() {
     ]);
 
     if (error) {
-      alert("Erro ao enviar convite.");
+      console.error("ERRO AO ENVIAR CONVITE:", error);
+      alert(error.message);
       return;
     }
 
