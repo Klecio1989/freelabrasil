@@ -11,6 +11,7 @@ type Convite = {
   projeto_id: string;
   mensagem: string;
   status?: string;
+  proposta_id?: string;
   created_at?: string;
   projeto_titulo?: string;
   contratante_nome?: string;
@@ -31,7 +32,6 @@ export default function ConvitesPage() {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
     if (!usuarioSalvo) {
-      console.log("SEM USUARIO NO LOCALSTORAGE");
       setUsuario(null);
       setCarregando(false);
       return;
@@ -40,16 +40,11 @@ export default function ConvitesPage() {
     const parsed = JSON.parse(usuarioSalvo);
     setUsuario(parsed);
 
-    console.log("USUARIO LOGADO:", parsed);
-
     const { data, error } = await supabase
       .from("convites")
       .select("*")
       .eq("freelancer_id", parsed.id)
       .order("created_at", { ascending: false });
-
-    console.log("CONVITES RETORNADOS:", data);
-    console.log("ERRO CONVITES:", error);
 
     if (error) {
       alert(error.message);
@@ -101,10 +96,80 @@ export default function ConvitesPage() {
     setCarregando(false);
   }
 
-  async function atualizarStatus(convite: Convite, status: "aceito" | "recusado") {
+  async function aceitarConvite(convite: Convite) {
+    if (!usuario) return;
+
+    const { data: propostaExistente } = await supabase
+      .from("propostas")
+      .select("id")
+      .eq("freelancer_id", convite.freelancer_id)
+      .eq("projeto_id", convite.projeto_id)
+      .maybeSingle();
+
+    let propostaId = propostaExistente?.id;
+
+    if (!propostaId) {
+      const { data: novaProposta, error: erroProposta } = await supabase
+        .from("propostas")
+        .insert([
+          {
+            freelancer_id: convite.freelancer_id,
+            projeto_id: convite.projeto_id,
+            valor: "A negociar",
+            prazo: 0,
+            mensagem: convite.mensagem || "Convite aceito pelo freelancer.",
+            status: "aceita",
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (erroProposta) {
+        alert(erroProposta.message);
+        return;
+      }
+
+      propostaId = novaProposta.id;
+    }
+
+    const { error: erroConvite } = await supabase
+      .from("convites")
+      .update({
+        status: "aceito",
+        proposta_id: propostaId,
+      })
+      .eq("id", convite.id);
+
+    if (erroConvite) {
+      alert(erroConvite.message);
+      return;
+    }
+
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: convite.contratante_id,
+        titulo: "Convite aceito",
+        descricao: `${usuario.nome || "Freelancer"} aceitou o convite do projeto "${convite.projeto_titulo}".`,
+        lida: false,
+        link: `/chat?proposta_id=${propostaId}`,
+      },
+    ]);
+
+    setConvites((prev) =>
+      prev.map((c) =>
+        c.id === convite.id
+          ? { ...c, status: "aceito", proposta_id: propostaId }
+          : c
+      )
+    );
+
+    alert("Convite aceito. Chat liberado.");
+  }
+
+  async function recusarConvite(convite: Convite) {
     const { error } = await supabase
       .from("convites")
-      .update({ status })
+      .update({ status: "recusado" })
       .eq("id", convite.id);
 
     if (error) {
@@ -115,20 +180,16 @@ export default function ConvitesPage() {
     await supabase.from("notificacoes").insert([
       {
         usuario_id: convite.contratante_id,
-        titulo: status === "aceito" ? "Convite aceito" : "Convite recusado",
-        descricao: `${usuario?.nome || "Freelancer"} ${
-          status === "aceito" ? "aceitou" : "recusou"
-        } o convite do projeto "${convite.projeto_titulo}".`,
+        titulo: "Convite recusado",
+        descricao: `${usuario?.nome || "Freelancer"} recusou o convite do projeto "${convite.projeto_titulo}".`,
         lida: false,
         link: "/propostas-recebidas",
       },
     ]);
 
     setConvites((prev) =>
-      prev.map((c) => (c.id === convite.id ? { ...c, status } : c))
+      prev.map((c) => (c.id === convite.id ? { ...c, status: "recusado" } : c))
     );
-
-    alert(status === "aceito" ? "Convite aceito." : "Convite recusado.");
   }
 
   if (!usuario && !carregando) {
@@ -230,14 +291,14 @@ export default function ConvitesPage() {
                     {(!convite.status || convite.status === "pendente") && (
                       <>
                         <button
-                          onClick={() => atualizarStatus(convite, "aceito")}
+                          onClick={() => aceitarConvite(convite)}
                           className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
                         >
                           Aceitar convite
                         </button>
 
                         <button
-                          onClick={() => atualizarStatus(convite, "recusado")}
+                          onClick={() => recusarConvite(convite)}
                           className="rounded-xl border border-red-400/30 px-5 py-3 font-bold text-red-300"
                         >
                           Recusar convite
@@ -245,12 +306,12 @@ export default function ConvitesPage() {
                       </>
                     )}
 
-                    {convite.status === "aceito" && (
+                    {convite.status === "aceito" && convite.proposta_id && (
                       <Link
-                        href={`/propostas/nova?projeto_id=${convite.projeto_id}`}
-                        className="rounded-xl bg-white px-5 py-3 text-center font-bold text-slate-950"
+                        href={`/chat?proposta_id=${convite.proposta_id}`}
+                        className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
                       >
-                        Enviar proposta
+                        Abrir chat
                       </Link>
                     )}
 
