@@ -10,7 +10,7 @@ type Convite = {
   freelancer_id: string;
   projeto_id: string;
   mensagem: string;
-  status: string;
+  status?: string;
   created_at?: string;
   projeto_titulo?: string;
   contratante_nome?: string;
@@ -22,29 +22,36 @@ export default function ConvitesPage() {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
+    carregarConvites();
+  }, []);
+
+  async function carregarConvites() {
+    setCarregando(true);
+
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
     if (!usuarioSalvo) {
+      console.log("SEM USUARIO NO LOCALSTORAGE");
+      setUsuario(null);
       setCarregando(false);
       return;
     }
 
     const parsed = JSON.parse(usuarioSalvo);
     setUsuario(parsed);
-    carregarConvites(parsed.id);
-  }, []);
 
-  async function carregarConvites(freelancerId: string) {
-    setCarregando(true);
+    console.log("USUARIO LOGADO:", parsed);
 
     const { data, error } = await supabase
       .from("convites")
       .select("*")
-      .eq("freelancer_id", freelancerId)
+      .eq("freelancer_id", parsed.id)
       .order("created_at", { ascending: false });
 
+    console.log("CONVITES RETORNADOS:", data);
+    console.log("ERRO CONVITES:", error);
+
     if (error) {
-      console.error("ERRO AO BUSCAR CONVITES:", error);
       alert(error.message);
       setCarregando(false);
       return;
@@ -63,34 +70,34 @@ export default function ConvitesPage() {
     let contratantesMap: Record<string, any> = {};
 
     if (projetoIds.length > 0) {
-      const { data: projetos } = await supabase
+      const { data: projetosData } = await supabase
         .from("projetos")
         .select("id,titulo")
         .in("id", projetoIds);
 
       projetosMap = Object.fromEntries(
-        projetos?.map((p: any) => [p.id, p]) || []
+        projetosData?.map((p: any) => [p.id, p]) || []
       );
     }
 
     if (contratanteIds.length > 0) {
-      const { data: contratantes } = await supabase
+      const { data: usuariosData } = await supabase
         .from("usuarios")
         .select("id,nome")
         .in("id", contratanteIds);
 
       contratantesMap = Object.fromEntries(
-        contratantes?.map((c: any) => [c.id, c]) || []
+        usuariosData?.map((u: any) => [u.id, u]) || []
       );
     }
 
-    const formatados = data.map((c: any) => ({
+    const convitesFormatados = data.map((c: any) => ({
       ...c,
       projeto_titulo: projetosMap[c.projeto_id]?.titulo || "Projeto",
       contratante_nome: contratantesMap[c.contratante_id]?.nome || "Contratante",
     }));
 
-    setConvites(formatados);
+    setConvites(convitesFormatados);
     setCarregando(false);
   }
 
@@ -109,7 +116,9 @@ export default function ConvitesPage() {
       {
         usuario_id: convite.contratante_id,
         titulo: status === "aceito" ? "Convite aceito" : "Convite recusado",
-        descricao: `${usuario?.nome || "Freelancer"} ${status === "aceito" ? "aceitou" : "recusou"} o convite do projeto "${convite.projeto_titulo}".`,
+        descricao: `${usuario?.nome || "Freelancer"} ${
+          status === "aceito" ? "aceitou" : "recusou"
+        } o convite do projeto "${convite.projeto_titulo}".`,
         lida: false,
         link: "/propostas-recebidas",
       },
@@ -122,7 +131,7 @@ export default function ConvitesPage() {
     alert(status === "aceito" ? "Convite aceito." : "Convite recusado.");
   }
 
-  if (!usuario) {
+  if (!usuario && !carregando) {
     return (
       <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
         <div className="mx-auto max-w-5xl">
@@ -160,12 +169,21 @@ export default function ConvitesPage() {
             </p>
           </div>
 
-          <Link
-            href="/painel-freelancer"
-            className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
-          >
-            Voltar
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={carregarConvites}
+              className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
+            >
+              Atualizar
+            </button>
+
+            <Link
+              href="/painel-freelancer"
+              className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
+            >
+              Voltar
+            </Link>
+          </div>
         </div>
 
         {carregando && (
