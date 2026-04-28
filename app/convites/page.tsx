@@ -6,10 +6,12 @@ import Link from "next/link";
 
 type Convite = {
   id: string;
+  contratante_id: string;
+  freelancer_id: string;
+  projeto_id: string;
   mensagem: string;
   status: string;
-  projeto_id: string;
-  contratante_id: string;
+  created_at?: string;
   projeto_titulo?: string;
   contratante_nome?: string;
 };
@@ -17,142 +19,233 @@ type Convite = {
 export default function ConvitesPage() {
   const [convites, setConvites] = useState<Convite[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (usuarioSalvo) {
-      const parsed = JSON.parse(usuarioSalvo);
-      setUsuario(parsed);
-      carregarConvites(parsed.id);
+
+    if (!usuarioSalvo) {
+      setCarregando(false);
+      return;
     }
+
+    const parsed = JSON.parse(usuarioSalvo);
+    setUsuario(parsed);
+    carregarConvites(parsed.id);
   }, []);
 
   async function carregarConvites(freelancerId: string) {
-    const { data } = await supabase
+    setCarregando(true);
+
+    const { data, error } = await supabase
       .from("convites")
       .select("*")
       .eq("freelancer_id", freelancerId)
       .order("created_at", { ascending: false });
 
-    if (!data || data.length === 0) {
-      setConvites([]);
+    if (error) {
+      console.error("ERRO AO BUSCAR CONVITES:", error);
+      alert(error.message);
+      setCarregando(false);
       return;
     }
 
-    const projetoIds = [...new Set(data.map((item: any) => item.projeto_id))];
-    const contratanteIds = [...new Set(data.map((item: any) => item.contratante_id))];
+    if (!data || data.length === 0) {
+      setConvites([]);
+      setCarregando(false);
+      return;
+    }
 
-    const { data: projetos } = await supabase
-      .from("projetos")
-      .select("id,titulo")
-      .in("id", projetoIds);
+    const projetoIds = [...new Set(data.map((c: any) => c.projeto_id).filter(Boolean))];
+    const contratanteIds = [...new Set(data.map((c: any) => c.contratante_id).filter(Boolean))];
 
-    const { data: contratantes } = await supabase
-      .from("usuarios")
-      .select("id,nome")
-      .in("id", contratanteIds);
+    let projetosMap: Record<string, any> = {};
+    let contratantesMap: Record<string, any> = {};
 
-    const projetosMap = Object.fromEntries(
-      projetos?.map((p: any) => [p.id, p]) || []
-    );
+    if (projetoIds.length > 0) {
+      const { data: projetos } = await supabase
+        .from("projetos")
+        .select("id,titulo")
+        .in("id", projetoIds);
 
-    const contratantesMap = Object.fromEntries(
-      contratantes?.map((c: any) => [c.id, c]) || []
-    );
+      projetosMap = Object.fromEntries(
+        projetos?.map((p: any) => [p.id, p]) || []
+      );
+    }
 
-    const formatados = data.map((item: any) => ({
-      ...item,
-      projeto_titulo: projetosMap[item.projeto_id]?.titulo || "Projeto",
-      contratante_nome: contratantesMap[item.contratante_id]?.nome || "Contratante",
+    if (contratanteIds.length > 0) {
+      const { data: contratantes } = await supabase
+        .from("usuarios")
+        .select("id,nome")
+        .in("id", contratanteIds);
+
+      contratantesMap = Object.fromEntries(
+        contratantes?.map((c: any) => [c.id, c]) || []
+      );
+    }
+
+    const formatados = data.map((c: any) => ({
+      ...c,
+      projeto_titulo: projetosMap[c.projeto_id]?.titulo || "Projeto",
+      contratante_nome: contratantesMap[c.contratante_id]?.nome || "Contratante",
     }));
 
     setConvites(formatados);
+    setCarregando(false);
   }
 
-  async function atualizarStatus(id: string, status: string, projetoTitulo?: string) {
-    if (!usuario) return;
+  async function atualizarStatus(convite: Convite, status: "aceito" | "recusado") {
+    const { error } = await supabase
+      .from("convites")
+      .update({ status })
+      .eq("id", convite.id);
 
-    await supabase.from("convites").update({ status }).eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
     await supabase.from("notificacoes").insert([
       {
-        usuario_id: usuario.id,
+        usuario_id: convite.contratante_id,
         titulo: status === "aceito" ? "Convite aceito" : "Convite recusado",
-        descricao: `Você ${status === "aceito" ? "aceitou" : "recusou"} o convite do projeto ${projetoTitulo || ""}.`,
+        descricao: `${usuario?.nome || "Freelancer"} ${status === "aceito" ? "aceitou" : "recusou"} o convite do projeto "${convite.projeto_titulo}".`,
         lida: false,
-        link: "/convites",
+        link: "/propostas-recebidas",
       },
     ]);
 
     setConvites((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status } : c))
+      prev.map((c) => (c.id === convite.id ? { ...c, status } : c))
+    );
+
+    alert(status === "aceito" ? "Convite aceito." : "Convite recusado.");
+  }
+
+  if (!usuario) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="text-4xl font-black">Meus convites</h1>
+          <p className="mt-4 text-slate-400">
+            Faça login como freelancer para visualizar seus convites.
+          </p>
+
+          <Link
+            href="/login"
+            className="mt-8 inline-block rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
+          >
+            Fazer login
+          </Link>
+        </div>
+      </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
+    <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-10 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-4xl font-bold">Meus convites</h1>
-            <p className="text-slate-400 mt-2">
+            <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+              Área do freelancer
+            </span>
+
+            <h1 className="mt-4 text-5xl font-black leading-tight">
+              Meus convites
+            </h1>
+
+            <p className="mt-4 text-lg text-slate-300">
               Convites recebidos de contratantes
             </p>
           </div>
 
           <Link
             href="/painel-freelancer"
-            className="border border-white/20 px-4 py-2 rounded-lg"
+            className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
           >
             Voltar
           </Link>
         </div>
 
+        {carregando && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Carregando convites...
+          </div>
+        )}
+
+        {!carregando && convites.length === 0 && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Nenhum convite recebido ainda.
+          </div>
+        )}
+
         <div className="grid gap-6">
-          {convites.map((convite) => (
-            <div
-              key={convite.id}
-              className="rounded-2xl border border-white/10 bg-slate-900 p-6"
-            >
-              <h2 className="text-2xl font-bold">{convite.projeto_titulo}</h2>
+          {!carregando &&
+            convites.map((convite) => (
+              <div
+                key={convite.id}
+                className="rounded-[2rem] border border-white/10 bg-white/5 p-7 shadow-2xl"
+              >
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="mb-4 flex flex-wrap gap-3">
+                      <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
+                        {(convite.status || "pendente").toUpperCase()}
+                      </span>
+                    </div>
 
-              <p className="text-slate-400 mt-2">
-                Contratante: {convite.contratante_nome}
-              </p>
+                    <h2 className="text-3xl font-black">
+                      {convite.projeto_titulo}
+                    </h2>
 
-              <p className="text-slate-300 mt-4">
-                {convite.mensagem || "Sem mensagem."}
-              </p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Contratante: {convite.contratante_nome}
+                    </p>
 
-              <p className="mt-4 text-sm">
-                Status: <b>{convite.status || "pendente"}</b>
-              </p>
+                    <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
+                      {convite.mensagem || "Sem mensagem."}
+                    </p>
+                  </div>
 
-              {(!convite.status || convite.status === "pendente") && (
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => atualizarStatus(convite.id, "aceito", convite.projeto_titulo)}
-                    className="bg-emerald-400 text-black px-5 py-3 rounded-lg font-bold"
-                  >
-                    Aceitar
-                  </button>
+                  <div className="flex min-w-[230px] flex-col gap-3">
+                    {(!convite.status || convite.status === "pendente") && (
+                      <>
+                        <button
+                          onClick={() => atualizarStatus(convite, "aceito")}
+                          className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+                        >
+                          Aceitar convite
+                        </button>
 
-                  <button
-                    onClick={() => atualizarStatus(convite.id, "recusado", convite.projeto_titulo)}
-                    className="bg-red-500 text-white px-5 py-3 rounded-lg font-bold"
-                  >
-                    Recusar
-                  </button>
+                        <button
+                          onClick={() => atualizarStatus(convite, "recusado")}
+                          className="rounded-xl border border-red-400/30 px-5 py-3 font-bold text-red-300"
+                        >
+                          Recusar convite
+                        </button>
+                      </>
+                    )}
+
+                    {convite.status === "aceito" && (
+                      <Link
+                        href={`/propostas/nova?projeto_id=${convite.projeto_id}`}
+                        className="rounded-xl bg-white px-5 py-3 text-center font-bold text-slate-950"
+                      >
+                        Enviar proposta
+                      </Link>
+                    )}
+
+                    <Link
+                      href="/projetos"
+                      className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"
+                    >
+                      Ver projetos
+                    </Link>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
-
-          {convites.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center text-slate-400">
-              Nenhum convite recebido ainda.
-            </div>
-          )}
+              </div>
+            ))}
         </div>
       </div>
     </main>
