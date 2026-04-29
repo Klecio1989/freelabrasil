@@ -1,380 +1,196 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 
 type Proposta = {
   id: string;
+  freelancer_id: string;
+  projeto_id: string;
   valor: string;
   prazo: number;
   mensagem: string;
   status: string;
-  freelancer_id: string;
-  projeto_id: string;
+  created_at?: string;
   freelancer_nome?: string;
-  freelancer_email?: string;
-  freelancer_plano?: string;
   projeto_titulo?: string;
 };
 
-export default function PropostasRecebidas() {
+export default function PropostasRecebidasPage() {
   const [propostas, setPropostas] = useState<Proposta[]>([]);
-  const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [usuario, setUsuario] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
-  const [usuarioId, setUsuarioId] = useState("");
 
   useEffect(() => {
-    const usuario = localStorage.getItem("freelabrasil_usuario");
-    if (!usuario) return;
-
-    const parsed = JSON.parse(usuario);
-    setUsuarioId(parsed.id);
-    carregarPropostas(parsed.id);
-
-    const channel = supabase
-      .channel(`propostas-recebidas-${parsed.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "propostas",
-        },
-        async () => {
-          await carregarPropostas(parsed.id);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    carregarPropostas();
   }, []);
 
-  async function carregarPropostas(contratanteId: string) {
+  async function carregarPropostas() {
     setCarregando(true);
 
-    const { data: projetosData } = await supabase
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+    if (!usuarioSalvo) return;
+
+    const parsed = JSON.parse(usuarioSalvo);
+    setUsuario(parsed);
+
+    const { data: projetos } = await supabase
       .from("projetos")
       .select("id,titulo")
-      .eq("contratante_id", contratanteId);
+      .eq("contratante_id", parsed.id);
 
-    if (!projetosData || projetosData.length === 0) {
+    if (!projetos || projetos.length === 0) {
       setPropostas([]);
       setCarregando(false);
       return;
     }
 
-    const projetoIds = projetosData.map((p: any) => p.id);
+    const projetoIds = projetos.map((p: any) => p.id);
 
     const { data: propostasData } = await supabase
       .from("propostas")
-      .select("id,valor,prazo,mensagem,status,freelancer_id,projeto_id")
-      .in("projeto_id", projetoIds);
+      .select("*")
+      .in("projeto_id", projetoIds)
+      .order("created_at", { ascending: false });
 
-    if (!propostasData || propostasData.length === 0) {
+    if (!propostasData) {
       setPropostas([]);
       setCarregando(false);
       return;
     }
 
     const freelancerIds = [
-      ...new Set(propostasData.map((p: any) => p.freelancer_id).filter(Boolean)),
+      ...new Set(propostasData.map((p: any) => p.freelancer_id)),
     ];
 
-    let usuariosMap: Record<string, any> = {};
+    const { data: freelancers } = await supabase
+      .from("usuarios")
+      .select("id,nome")
+      .in("id", freelancerIds);
 
-    if (freelancerIds.length > 0) {
-      const { data: usuariosData } = await supabase
-        .from("usuarios")
-        .select("id,nome,email,plano")
-        .in("id", freelancerIds);
+    const mapFreela = Object.fromEntries(
+      freelancers?.map((f: any) => [f.id, f.nome]) || []
+    );
 
-      if (usuariosData) {
-        usuariosMap = Object.fromEntries(
-          usuariosData.map((u: any) => [u.id, u])
-        );
-      }
-    }
-
-    const projetosMap = Object.fromEntries(
-      projetosData.map((p: any) => [p.id, p])
+    const mapProjeto = Object.fromEntries(
+      projetos.map((p: any) => [p.id, p.titulo])
     );
 
     const formatadas = propostasData.map((p: any) => ({
       ...p,
-      freelancer_nome: usuariosMap[p.freelancer_id]?.nome || "Freelancer",
-      freelancer_email: usuariosMap[p.freelancer_id]?.email || "",
-      freelancer_plano: usuariosMap[p.freelancer_id]?.plano || "gratuito",
-      projeto_titulo: projetosMap[p.projeto_id]?.titulo || "Projeto",
+      freelancer_nome: mapFreela[p.freelancer_id] || "Freelancer",
+      projeto_titulo: mapProjeto[p.projeto_id] || "Projeto",
     }));
-
-    const prioridadePlano: Record<string, number> = {
-      pro: 0,
-      plus: 1,
-      gratuito: 2,
-    };
-
-    formatadas.sort((a: any, b: any) => {
-      const prioridadeA = prioridadePlano[a.freelancer_plano || "gratuito"];
-      const prioridadeB = prioridadePlano[b.freelancer_plano || "gratuito"];
-
-      if (prioridadeA !== prioridadeB) {
-        return prioridadeA - prioridadeB;
-      }
-
-      return 0;
-    });
 
     setPropostas(formatadas);
     setCarregando(false);
   }
 
-  async function criarNotificacao(destinoId: string, titulo: string, descricao: string, link: string) {
+  async function atualizarStatus(proposta: Proposta, status: "aceita" | "recusada") {
+    const { error } = await supabase
+      .from("propostas")
+      .update({ status })
+      .eq("id", proposta.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     await supabase.from("notificacoes").insert([
       {
-        usuario_id: destinoId,
-        titulo,
-        descricao,
+        usuario_id: proposta.freelancer_id,
+        titulo: status === "aceita" ? "Proposta aceita" : "Proposta recusada",
+        descricao: `Sua proposta para "${proposta.projeto_titulo}" foi ${status}.`,
         lida: false,
-        link,
+        link: `/chat?proposta_id=${proposta.id}`,
       },
     ]);
-  }
-
-  async function atualizarStatus(id: string, status: string, freelancerId: string, projetoTitulo?: string) {
-    await supabase.from("propostas").update({ status }).eq("id", id);
-
-    await criarNotificacao(
-      freelancerId,
-      status === "aceita" ? "Proposta aceita" : "Proposta recusada",
-      `Sua proposta para o projeto "${projetoTitulo || "Projeto"}" foi ${status}.`,
-      "/minhas-propostas"
-    );
 
     setPropostas((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status } : p))
+      prev.map((p) =>
+        p.id === proposta.id ? { ...p, status } : p
+      )
     );
-  }
 
-  const propostasFiltradas = useMemo(() => {
-    return propostas.filter((p) => {
-      const texto =
-        `${p.projeto_titulo || ""} ${p.freelancer_nome || ""} ${p.freelancer_email || ""} ${p.mensagem || ""}`.toLowerCase();
-
-      const bateBusca = busca ? texto.includes(busca.toLowerCase()) : true;
-
-      const statusAtual = p.status || "pendente";
-      const bateStatus =
-        filtroStatus === "todos" ? true : statusAtual === filtroStatus;
-
-      return bateBusca && bateStatus;
-    });
-  }, [propostas, busca, filtroStatus]);
-
-  function badgePlano(plano?: string) {
-    if (plano === "pro") {
-      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
-    }
-
-    if (plano === "plus") {
-      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
-    }
-
-    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
-  }
-
-  function badgeStatus(status?: string) {
-    if (status === "aceita") {
-      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">ACEITA</span>;
-    }
-
-    if (status === "recusada") {
-      return <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">RECUSADA</span>;
-    }
-
-    return <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">PENDENTE</span>;
-  }
-
-  function cardDestaque(plano?: string) {
-    if (plano === "pro") return "border-purple-500/40 bg-purple-500/5";
-    if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/5";
-    return "border-white/10 bg-white/5";
+    alert(status === "aceita" ? "Proposta aceita!" : "Proposta recusada.");
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <section className="mx-auto max-w-7xl px-6 py-14">
-        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-              Gestão de propostas
-            </span>
-
-            <h1 className="mt-5 text-5xl font-black leading-tight">
-              Propostas recebidas
-            </h1>
-
-            <p className="mt-5 text-lg leading-8 text-slate-300">
-              Avalie freelancers, aceite propostas, recuse candidatos e avance nas contratações.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Total</div>
-              <div className="mt-1 text-2xl font-black">{propostasFiltradas.length}</div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Pendentes</div>
-              <div className="mt-1 text-2xl font-black">
-                {propostasFiltradas.filter((p) => !p.status || p.status === "pendente").length}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Aceitas</div>
-              <div className="mt-1 text-2xl font-black">
-                {propostasFiltradas.filter((p) => p.status === "aceita").length}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-8 grid gap-4 md:grid-cols-[1fr_220px]">
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por projeto, freelancer, email ou mensagem"
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-          />
-
-          <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-          >
-            <option value="todos">Todos os status</option>
-            <option value="pendente">Pendente</option>
-            <option value="aceita">Aceita</option>
-            <option value="recusada">Recusada</option>
-          </select>
-        </div>
+    <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-5xl font-black mb-10">
+          Propostas recebidas
+        </h1>
 
         {carregando && (
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 text-slate-300">
-            Carregando propostas...
-          </div>
+          <p className="text-slate-400">Carregando...</p>
         )}
 
-        {!carregando && propostasFiltradas.length === 0 && (
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center">
-            <h2 className="text-2xl font-black">Nenhuma proposta encontrada</h2>
-            <p className="mt-3 text-slate-400">
-              Ajuste os filtros ou aguarde novos envios.
-            </p>
-          </div>
+        {!carregando && propostas.length === 0 && (
+          <p className="text-slate-400">Nenhuma proposta recebida.</p>
         )}
 
         <div className="grid gap-6">
-          {!carregando &&
-            propostasFiltradas.map((p) => (
-              <div
-                key={p.id}
-                className={`rounded-[2rem] border p-7 shadow-2xl transition hover:scale-[1.005] ${cardDestaque(
-                  p.freelancer_plano
-                )}`}
-              >
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-4xl">
-                    <div className="mb-4 flex flex-wrap gap-3">
-                      {badgePlano(p.freelancer_plano)}
-                      {badgeStatus(p.status)}
-                    </div>
+          {propostas.map((p) => (
+            <div
+              key={p.id}
+              className="bg-white/5 border border-white/10 p-6 rounded-2xl"
+            >
+              <h2 className="text-2xl font-bold">
+                {p.projeto_titulo}
+              </h2>
 
-                    <h2 className="text-2xl font-black md:text-3xl">
-                      {p.projeto_titulo}
-                    </h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Freelancer: {p.freelancer_nome}
+              </p>
 
-                    <p className="mt-2 text-sm text-slate-400">
-                      Freelancer: {p.freelancer_nome}
-                    </p>
+              <p className="mt-4">{p.mensagem}</p>
 
-                    <p className="text-sm text-slate-500">{p.freelancer_email}</p>
-
-                    <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">
-                      {p.mensagem}
-                    </p>
-
-                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-4">
-                        <div className="text-sm text-slate-400">Valor</div>
-                        <div className="mt-1 text-lg font-bold">{p.valor}</div>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-4">
-                        <div className="text-sm text-slate-400">Prazo</div>
-                        <div className="mt-1 text-lg font-bold">{p.prazo} dias</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex min-w-[250px] flex-col gap-3">
-                    <Link
-                      href={`/freelancer/${p.freelancer_id}`}
-                      className="rounded-xl border border-white/15 px-5 py-3 text-center font-medium text-white transition hover:bg-white/5"
-                    >
-                      Ver perfil público
-                    </Link>
-
-                    {p.status === "aceita" && (
-                      <>
-                        <Link
-                          href={`/chat?proposta_id=${p.id}`}
-                          className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
-                        >
-                          Abrir chat
-                        </Link>
-
-                        <Link
-                          href={`/avaliar?proposta_id=${p.id}&freelancer_id=${p.freelancer_id}`}
-                          className="rounded-xl border border-yellow-400/30 px-5 py-3 text-center font-bold text-yellow-300 transition hover:bg-yellow-400/10"
-                        >
-                          Avaliar freelancer
-                        </Link>
-                      </>
-                    )}
-
-                    {(!p.status || p.status === "pendente") && (
-                      <>
-                        <button
-                          onClick={() =>
-                            atualizarStatus(p.id, "aceita", p.freelancer_id, p.projeto_titulo)
-                          }
-                          className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
-                        >
-                          Aceitar proposta
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            atualizarStatus(p.id, "recusada", p.freelancer_id, p.projeto_titulo)
-                          }
-                          className="rounded-xl border border-red-400/30 px-5 py-3 font-bold text-red-300 transition hover:bg-red-400/10"
-                        >
-                          Recusar proposta
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+              <div className="mt-4 text-sm">
+                💰 Valor: {p.valor} <br />
+                ⏱ Prazo: {p.prazo} dias
               </div>
-            ))}
+
+              <div className="mt-6 flex gap-3 flex-wrap">
+                {(!p.status || p.status === "pendente") && (
+                  <>
+                    <button
+                      onClick={() => atualizarStatus(p, "aceita")}
+                      className="bg-emerald-400 text-black px-4 py-2 rounded font-bold"
+                    >
+                      Aceitar
+                    </button>
+
+                    <button
+                      onClick={() => atualizarStatus(p, "recusada")}
+                      className="border border-red-400 text-red-300 px-4 py-2 rounded"
+                    >
+                      Recusar
+                    </button>
+                  </>
+                )}
+
+                {p.status === "aceita" && (
+                  <Link
+                    href={`/chat?proposta_id=${p.id}`}
+                    className="bg-emerald-400 text-black px-4 py-2 rounded font-bold"
+                  >
+                    Abrir chat
+                  </Link>
+                )}
+
+                {p.status === "recusada" && (
+                  <span className="text-red-400 font-bold">
+                    Proposta recusada
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      </section>
+      </div>
     </main>
   );
 }
