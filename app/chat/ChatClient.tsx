@@ -29,11 +29,15 @@ export default function ChatClient({ propostaId }: Props) {
   const mensagensRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const usuario = localStorage.getItem("freelabrasil_usuario");
-    if (usuario) {
-      const parsed = JSON.parse(usuario);
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+
+    if (usuarioSalvo) {
+      const parsed = JSON.parse(usuarioSalvo);
       setUsuarioId(parsed.id);
-      carregarDestinatario(parsed.id);
+
+      if (propostaId) {
+        carregarDestinatario(parsed.id);
+      }
     }
 
     if (!propostaId) return;
@@ -51,7 +55,13 @@ export default function ChatClient({ propostaId }: Props) {
           filter: `proposta_id=eq.${propostaId}`,
         },
         (payload) => {
-          setMensagens((prev) => [...prev, payload.new as Mensagem]);
+          const nova = payload.new as Mensagem;
+
+          setMensagens((prev) => {
+            const jaExiste = prev.some((m) => m.id === nova.id);
+            if (jaExiste) return prev;
+            return [...prev, nova];
+          });
         }
       )
       .subscribe();
@@ -68,21 +78,21 @@ export default function ChatClient({ propostaId }: Props) {
   }, [mensagens]);
 
   async function carregarDestinatario(remetenteAtualId: string) {
-    const { data: proposta } = await supabase
+    const { data: proposta, error: propostaError } = await supabase
       .from("propostas")
       .select("id,freelancer_id,projeto_id")
       .eq("id", propostaId)
       .single();
 
-    if (!proposta) return;
+    if (propostaError || !proposta) return;
 
-    const { data: projeto } = await supabase
+    const { data: projeto, error: projetoError } = await supabase
       .from("projetos")
       .select("id,contratante_id")
       .eq("id", proposta.projeto_id)
       .single();
 
-    if (!projeto) return;
+    if (projetoError || !projeto) return;
 
     if (remetenteAtualId === proposta.freelancer_id) {
       setDestinatarioId(projeto.contratante_id);
@@ -158,17 +168,21 @@ export default function ChatClient({ propostaId }: Props) {
       }
 
       if (destinatarioId) {
-        await supabase.from("notificacoes").insert([
+        const { error: notifError } = await supabase.from("notificacoes").insert([
           {
             usuario_id: destinatarioId,
-            titulo: "Nova mensagem no chat",
+            titulo: "Nova mensagem",
             descricao: arquivoNome
               ? `Você recebeu uma nova mensagem com anexo: ${arquivoNome}`
-              : "Você recebeu uma nova mensagem.",
+              : novaMensagem.trim() || "Você recebeu uma nova mensagem.",
             lida: false,
             link: `/chat?proposta_id=${propostaId}`,
           },
         ]);
+
+        if (notifError) {
+          console.error("ERRO NOTIFICAÇÃO CHAT:", notifError);
+        }
       }
 
       setNovaMensagem("");
@@ -195,7 +209,7 @@ export default function ChatClient({ propostaId }: Props) {
             <img
               src={m.arquivo_url}
               alt={nome}
-              className="max-w-[220px] rounded-lg mb-2 border border-white/10"
+              className="mb-2 max-w-[220px] rounded-lg border border-white/10"
             />
           </a>
         )}
@@ -208,22 +222,22 @@ export default function ChatClient({ propostaId }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between mb-6">
+    <main className="min-h-screen bg-slate-950 p-6 text-white">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-6 flex justify-between">
           <h1 className="text-2xl font-bold">Chat</h1>
 
-          <Link href="/dashboard" className="border border-white/20 px-3 py-1 rounded">
+          <Link href="/dashboard" className="rounded border border-white/20 px-3 py-1">
             Voltar
           </Link>
         </div>
 
         <div
           ref={mensagensRef}
-          className="bg-slate-900 p-4 rounded-xl h-[400px] overflow-y-auto space-y-3 border border-white/10"
+          className="h-[400px] space-y-3 overflow-y-auto rounded-xl border border-white/10 bg-slate-900 p-4"
         >
           {mensagens.length === 0 && (
-            <div className="text-slate-400 text-center mt-20">
+            <div className="mt-20 text-center text-slate-400">
               Nenhuma mensagem ainda.
             </div>
           )}
@@ -231,9 +245,9 @@ export default function ChatClient({ propostaId }: Props) {
           {mensagens.map((m) => (
             <div
               key={m.id}
-              className={`p-3 rounded-xl max-w-[70%] ${
+              className={`max-w-[70%] rounded-xl p-3 ${
                 m.remetente_id === usuarioId
-                  ? "bg-emerald-400 text-black ml-auto"
+                  ? "ml-auto bg-emerald-400 text-black"
                   : "bg-slate-700 text-white"
               }`}
             >
@@ -247,7 +261,7 @@ export default function ChatClient({ propostaId }: Props) {
           <textarea
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
-            className="w-full p-3 rounded-xl bg-slate-800 border border-white/10 outline-none"
+            className="w-full rounded-xl border border-white/10 bg-slate-800 p-3 outline-none"
             placeholder="Digite uma mensagem"
             rows={4}
           />
@@ -255,7 +269,7 @@ export default function ChatClient({ propostaId }: Props) {
           <div className="flex items-center gap-3">
             <label
               htmlFor="arquivo-chat"
-              className="cursor-pointer flex items-center justify-center w-12 h-12 rounded-xl border border-white/10 bg-slate-800 hover:bg-slate-700 transition"
+              className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-slate-800 transition hover:bg-slate-700"
               title="Anexar arquivo"
             >
               <Paperclip size={22} />
@@ -269,7 +283,7 @@ export default function ChatClient({ propostaId }: Props) {
             />
 
             {arquivo && (
-              <span className="text-sm text-slate-400 truncate max-w-[260px]">
+              <span className="max-w-[260px] truncate text-sm text-slate-400">
                 {arquivo.name}
               </span>
             )}
@@ -278,7 +292,7 @@ export default function ChatClient({ propostaId }: Props) {
           <button
             onClick={enviarMensagem}
             disabled={enviando}
-            className="bg-emerald-400 text-black px-6 py-3 rounded-xl font-bold disabled:opacity-60"
+            className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-black disabled:opacity-60"
           >
             {enviando ? "Enviando..." : "Enviar"}
           </button>
