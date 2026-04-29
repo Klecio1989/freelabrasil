@@ -327,7 +327,12 @@ export default function PerfilPage() {
                     >
                       Editar perfil
                     </button>
-
+                    <Link
+                     href="/planos"
+                     className="bg-purple-500 text-white font-bold px-6 py-3 rounded-lg"
+                    >
+                     Alterar plano
+                    </Link>
                     <button
                       onClick={desativarConta}
                       disabled={desativando}
