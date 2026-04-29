@@ -4,156 +4,242 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 
-export default function Dashboard() {
-  const [usuario, setUsuario] = useState<any>(null);
+type Usuario = {
+  id: string;
+  nome: string;
+  tipo_usuario: string;
+  plano?: string;
+};
 
-  const [projetos, setProjetos] = useState(0);
-  const [propostas, setPropostas] = useState(0);
-  const [convites, setConvites] = useState(0);
-  const [favoritos, setFavoritos] = useState(0);
+export default function DashboardPage() {
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  const [totalPropostas, setTotalPropostas] = useState(0);
+  const [propostasAceitas, setPropostasAceitas] = useState(0);
+  const [propostasRecusadas, setPropostasRecusadas] = useState(0);
+  const [propostasPendentes, setPropostasPendentes] = useState(0);
 
   useEffect(() => {
-    const user = localStorage.getItem("freelabrasil_usuario");
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
-    if (user) {
-      const parsed = JSON.parse(user);
-      setUsuario(parsed);
-      carregarDados(parsed);
+    if (!usuarioSalvo) {
+      setCarregando(false);
+      return;
     }
+
+    const parsed = JSON.parse(usuarioSalvo);
+    setUsuario(parsed);
+    carregarMetricas(parsed);
   }, []);
 
-  async function carregarDados(user: any) {
+  async function carregarMetricas(user: Usuario) {
+    setCarregando(true);
+
+    if (user.tipo_usuario === "freelancer") {
+      const { data, error } = await supabase
+        .from("propostas")
+        .select("id,status")
+        .eq("freelancer_id", user.id);
+
+      if (!error && data) {
+        calcularPropostas(data);
+      }
+
+      setCarregando(false);
+      return;
+    }
+
     if (user.tipo_usuario === "contratante") {
-      const { data: projetosData } = await supabase
+      const { data: projetos } = await supabase
         .from("projetos")
         .select("id")
         .eq("contratante_id", user.id);
 
-      const projetoIds = projetosData?.map((p: any) => p.id) || [];
+      const projetoIds = projetos?.map((p: any) => p.id) || [];
 
-      const { data: propostasData } = await supabase
+      if (projetoIds.length === 0) {
+        calcularPropostas([]);
+        setCarregando(false);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("propostas")
-        .select("id")
+        .select("id,status,projeto_id")
         .in("projeto_id", projetoIds);
 
-      const { data: favoritosData } = await supabase
-        .from("favoritos")
-        .select("id")
-        .eq("contratante_id", user.id);
+      if (!error && data) {
+        calcularPropostas(data);
+      }
 
-      const { data: convitesData } = await supabase
-        .from("convites")
-        .select("id")
-        .eq("contratante_id", user.id);
-
-      setProjetos(projetosData?.length || 0);
-      setPropostas(propostasData?.length || 0);
-      setFavoritos(favoritosData?.length || 0);
-      setConvites(convitesData?.length || 0);
+      setCarregando(false);
+      return;
     }
 
-    if (user.tipo_usuario === "freelancer") {
-      const { data: propostasData } = await supabase
-        .from("propostas")
-        .select("id,status")
-        .eq("freelancer_id", user.id);
-
-      const { data: convitesData } = await supabase
-        .from("convites")
-        .select("id,status")
-        .eq("freelancer_id", user.id);
-
-      setPropostas(propostasData?.length || 0);
-      setConvites(convitesData?.length || 0);
-    }
+    setCarregando(false);
   }
 
-  function card(titulo: string, valor: number) {
+  function calcularPropostas(lista: any[]) {
+    const total = lista.length;
+    const aceitas = lista.filter((p) => p.status === "aceita").length;
+    const recusadas = lista.filter((p) => p.status === "recusada").length;
+    const pendentes = lista.filter(
+      (p) => !p.status || p.status === "pendente"
+    ).length;
+
+    setTotalPropostas(total);
+    setPropostasAceitas(aceitas);
+    setPropostasRecusadas(recusadas);
+    setPropostasPendentes(pendentes);
+  }
+
+  function card(titulo: string, valor: number, detalhe: string, destaque?: string) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-        <div className="text-sm text-slate-400">{titulo}</div>
-        <div className="mt-2 text-3xl font-black">{valor}</div>
+      <div className={`rounded-2xl border p-6 ${destaque || "border-white/10 bg-white/5"}`}>
+        <p className="text-sm text-slate-400">{titulo}</p>
+        <p className="mt-2 text-4xl font-black">{valor}</p>
+        <p className="mt-2 text-sm text-slate-500">{detalhe}</p>
       </div>
+    );
+  }
+
+  if (!usuario && !carregando) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="text-4xl font-black">Dashboard</h1>
+          <p className="mt-4 text-slate-400">
+            Faça login para visualizar suas métricas.
+          </p>
+
+          <Link
+            href="/login"
+            className="mt-8 inline-block rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
+          >
+            Fazer login
+          </Link>
+        </div>
+      </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-10">
-          <h1 className="text-5xl font-black">Dashboard</h1>
-          <p className="text-slate-400 mt-3">
-            Visão geral da sua conta e performance na plataforma
-          </p>
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+              Visão executiva
+            </span>
+
+            <h1 className="mt-4 text-5xl font-black leading-tight">
+              Dashboard
+            </h1>
+
+            <p className="mt-4 text-lg text-slate-300">
+              Acompanhe suas propostas, aceite, recusa e oportunidades em andamento.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+            <p className="text-sm text-slate-400">Plano atual</p>
+            <p className="mt-1 text-2xl font-black uppercase">
+              {usuario?.plano || "gratuito"}
+            </p>
+          </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid md:grid-cols-4 gap-4 mb-10">
-          {card("Projetos", projetos)}
-          {card("Propostas", propostas)}
-          {card("Convites", convites)}
-          {card("Favoritos", favoritos)}
-        </div>
+        {carregando ? (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Carregando métricas...
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-6 md:grid-cols-4">
+              {card(
+                "Total de propostas",
+                totalPropostas,
+                "Todas as propostas vinculadas à sua conta",
+                "border-white/10 bg-white/5"
+              )}
 
-        {/* Ações rápidas */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {usuario?.tipo_usuario === "contratante" && (
-            <>
-              <Link href="/projetos/novo" className="btn">
-                Criar projeto
-              </Link>
+              {card(
+                "Propostas aceitas",
+                propostasAceitas,
+                "Propostas que avançaram para negociação/chat",
+                "border-emerald-400/40 bg-emerald-400/5"
+              )}
 
-              <Link href="/propostas-recebidas" className="btn">
-                Ver propostas recebidas
-              </Link>
+              {card(
+                "Propostas recusadas",
+                propostasRecusadas,
+                "Propostas recusadas no processo",
+                "border-red-400/40 bg-red-400/5"
+              )}
 
-              <Link href="/freelancers" className="btn">
-                Buscar freelancers
-              </Link>
+              {card(
+                "Propostas pendentes",
+                propostasPendentes,
+                "Aguardando decisão",
+                "border-yellow-400/40 bg-yellow-400/5"
+              )}
+            </div>
 
-              <Link href="/favoritos" className="btn">
-                Meus favoritos
-              </Link>
-            </>
-          )}
+            <div className="mt-10 grid gap-4 md:grid-cols-3">
+              {usuario?.tipo_usuario === "freelancer" && (
+                <>
+                  <Link
+                    href="/projetos"
+                    className="rounded-xl bg-emerald-400 px-6 py-4 text-center font-bold text-slate-950"
+                  >
+                    Buscar projetos
+                  </Link>
 
-          {usuario?.tipo_usuario === "freelancer" && (
-            <>
-              <Link href="/projetos" className="btn">
-                Buscar projetos
-              </Link>
+                  <Link
+                    href="/minhas-propostas"
+                    className="rounded-xl border border-white/20 px-6 py-4 text-center font-bold text-white"
+                  >
+                    Minhas propostas
+                  </Link>
 
-              <Link href="/minhas-propostas" className="btn">
-                Minhas propostas
-              </Link>
+                  <Link
+                    href="/convites"
+                    className="rounded-xl border border-white/20 px-6 py-4 text-center font-bold text-white"
+                  >
+                    Meus convites
+                  </Link>
+                </>
+              )}
 
-              <Link href="/convites" className="btn">
-                Convites recebidos
-              </Link>
+              {usuario?.tipo_usuario === "contratante" && (
+                <>
+                  <Link
+                    href="/projetos/novo"
+                    className="rounded-xl bg-emerald-400 px-6 py-4 text-center font-bold text-slate-950"
+                  >
+                    Criar projeto
+                  </Link>
 
-              <Link href="/perfil" className="btn">
-                Editar perfil
-              </Link>
-            </>
-          )}
-        </div>
+                  <Link
+                    href="/propostas-recebidas"
+                    className="rounded-xl border border-white/20 px-6 py-4 text-center font-bold text-white"
+                  >
+                    Propostas recebidas
+                  </Link>
+
+                  <Link
+                    href="/freelancers"
+                    className="rounded-xl border border-white/20 px-6 py-4 text-center font-bold text-white"
+                  >
+                    Buscar freelancers
+                  </Link>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
-
-      <style jsx>{`
-        .btn {
-          display: block;
-          padding: 16px;
-          border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.1);
-          text-align: center;
-          font-weight: bold;
-          transition: 0.2s;
-        }
-
-        .btn:hover {
-          background: rgba(255,255,255,0.05);
-        }
-      `}</style>
     </main>
   );
 }
