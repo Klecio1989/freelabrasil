@@ -30,13 +30,13 @@ export default function PlanosPage() {
 
       const data = await res.json();
 
-      if (!data.init_point) {
-        console.log(data);
-        alert("Erro ao gerar pagamento");
+      if (!data.init_point && !data.sandbox_init_point) {
+        console.log("ERRO MP:", data);
+        alert(data.error || "Erro ao gerar pagamento");
         return;
       }
 
-      window.location.href = data.init_point;
+      window.location.href = data.sandbox_init_point || data.init_point;
     } catch (err) {
       console.log(err);
       alert("Erro ao conectar pagamento");
