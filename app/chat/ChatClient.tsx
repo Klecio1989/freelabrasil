@@ -23,9 +23,18 @@ export default function ChatClient({ propostaId }: Props) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [novaMensagem, setNovaMensagem] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
+
+  const [usuario, setUsuario] = useState<any>(null);
   const [usuarioId, setUsuarioId] = useState("");
   const [destinatarioId, setDestinatarioId] = useState("");
+  const [contratanteId, setContratanteId] = useState("");
+  const [freelancerId, setFreelancerId] = useState("");
+  const [statusProposta, setStatusProposta] = useState("");
+  const [tituloProjeto, setTituloProjeto] = useState("");
+
   const [enviando, setEnviando] = useState(false);
+  const [processandoStatus, setProcessandoStatus] = useState(false);
+
   const mensagensRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,10 +42,11 @@ export default function ChatClient({ propostaId }: Props) {
 
     if (usuarioSalvo) {
       const parsed = JSON.parse(usuarioSalvo);
+      setUsuario(parsed);
       setUsuarioId(parsed.id);
 
       if (propostaId) {
-        carregarDestinatario(parsed.id);
+        carregarDadosProposta(parsed.id);
       }
     }
 
@@ -77,22 +87,28 @@ export default function ChatClient({ propostaId }: Props) {
     }
   }, [mensagens]);
 
-  async function carregarDestinatario(remetenteAtualId: string) {
+  async function carregarDadosProposta(remetenteAtualId: string) {
     const { data: proposta, error: propostaError } = await supabase
       .from("propostas")
-      .select("id,freelancer_id,projeto_id")
+      .select("id,freelancer_id,projeto_id,status")
       .eq("id", propostaId)
       .single();
 
     if (propostaError || !proposta) return;
 
+    setFreelancerId(proposta.freelancer_id);
+    setStatusProposta(proposta.status || "");
+
     const { data: projeto, error: projetoError } = await supabase
       .from("projetos")
-      .select("id,contratante_id")
+      .select("id,titulo,contratante_id")
       .eq("id", proposta.projeto_id)
       .single();
 
     if (projetoError || !projeto) return;
+
+    setContratanteId(projeto.contratante_id);
+    setTituloProjeto(projeto.titulo || "Projeto");
 
     if (remetenteAtualId === proposta.freelancer_id) {
       setDestinatarioId(projeto.contratante_id);
@@ -117,6 +133,18 @@ export default function ChatClient({ propostaId }: Props) {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9.\-_]/g, "-")
       .toLowerCase();
+  }
+
+  async function criarNotificacao(usuarioDestino: string, titulo: string, descricao: string, link: string) {
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: usuarioDestino,
+        titulo,
+        descricao,
+        lida: false,
+        link,
+      },
+    ]);
   }
 
   async function enviarMensagem() {
@@ -168,21 +196,14 @@ export default function ChatClient({ propostaId }: Props) {
       }
 
       if (destinatarioId) {
-        const { error: notifError } = await supabase.from("notificacoes").insert([
-          {
-            usuario_id: destinatarioId,
-            titulo: "Nova mensagem",
-            descricao: arquivoNome
-              ? `Você recebeu uma nova mensagem com anexo: ${arquivoNome}`
-              : novaMensagem.trim() || "Você recebeu uma nova mensagem.",
-            lida: false,
-            link: `/chat?proposta_id=${propostaId}`,
-          },
-        ]);
-
-        if (notifError) {
-          console.error("ERRO NOTIFICAÇÃO CHAT:", notifError);
-        }
+        await criarNotificacao(
+          destinatarioId,
+          "Nova mensagem",
+          arquivoNome
+            ? `Você recebeu uma nova mensagem com anexo: ${arquivoNome}`
+            : novaMensagem.trim() || "Você recebeu uma nova mensagem.",
+          `/chat?proposta_id=${propostaId}`
+        );
       }
 
       setNovaMensagem("");
@@ -192,6 +213,85 @@ export default function ChatClient({ propostaId }: Props) {
       if (input) input.value = "";
     } finally {
       setEnviando(false);
+    }
+  }
+
+  async function freelancerFinalizarProjeto() {
+    if (!usuario || usuario.id !== freelancerId) {
+      alert("Apenas o freelancer pode informar a finalização.");
+      return;
+    }
+
+    const confirmar = window.confirm("Confirmar que você finalizou este projeto?");
+    if (!confirmar) return;
+
+    try {
+      setProcessandoStatus(true);
+
+      const { error } = await supabase
+        .from("propostas")
+        .update({
+          status: "finalizacao_solicitada",
+          finalizado_em: new Date().toISOString(),
+        })
+        .eq("id", propostaId);
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      setStatusProposta("finalizacao_solicitada");
+
+      await criarNotificacao(
+        contratanteId,
+        "Projeto finalizado pelo freelancer",
+        `O freelancer informou que concluiu o projeto "${tituloProjeto}". Confirme a entrega e avalie.`,
+        `/chat?proposta_id=${propostaId}`
+      );
+
+      alert("Finalização enviada ao contratante.");
+    } finally {
+      setProcessandoStatus(false);
+    }
+  }
+
+  async function contratanteConfirmarFinalizacao() {
+    if (!usuario || usuario.id !== contratanteId) {
+      alert("Apenas o contratante pode confirmar a finalização.");
+      return;
+    }
+
+    const confirmar = window.confirm("Confirmar que o projeto foi entregue corretamente?");
+    if (!confirmar) return;
+
+    try {
+      setProcessandoStatus(true);
+
+      const { error } = await supabase
+        .from("propostas")
+        .update({
+          status: "concluida",
+        })
+        .eq("id", propostaId);
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      setStatusProposta("concluida");
+
+      await criarNotificacao(
+        freelancerId,
+        "Projeto confirmado pelo contratante",
+        `O contratante confirmou a conclusão do projeto "${tituloProjeto}". Agora você pode avaliá-lo.`,
+        `/avaliar?proposta_id=${propostaId}&avaliado_id=${contratanteId}&tipo_avaliado=contratante`
+      );
+
+      window.location.href = `/avaliar?proposta_id=${propostaId}&avaliado_id=${freelancerId}&tipo_avaliado=freelancer`;
+    } finally {
+      setProcessandoStatus(false);
     }
   }
 
@@ -224,12 +324,65 @@ export default function ChatClient({ propostaId }: Props) {
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-white">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-6 flex justify-between">
-          <h1 className="text-2xl font-bold">Chat</h1>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Chat</h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Status: {statusProposta || "pendente"}
+            </p>
+          </div>
 
           <Link href="/dashboard" className="rounded border border-white/20 px-3 py-1">
             Voltar
           </Link>
+        </div>
+
+        <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4">
+          {usuario?.id === freelancerId && statusProposta === "aceita" && (
+            <button
+              onClick={freelancerFinalizarProjeto}
+              disabled={processandoStatus}
+              className="rounded-xl bg-purple-500 px-5 py-3 font-bold text-white disabled:opacity-60"
+            >
+              {processandoStatus ? "Enviando..." : "Informar que finalizei o projeto"}
+            </button>
+          )}
+
+          {usuario?.id === contratanteId && statusProposta === "finalizacao_solicitada" && (
+            <button
+              onClick={contratanteConfirmarFinalizacao}
+              disabled={processandoStatus}
+              className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950 disabled:opacity-60"
+            >
+              {processandoStatus ? "Confirmando..." : "Confirmar entrega e avaliar freelancer"}
+            </button>
+          )}
+
+          {statusProposta === "concluida" && usuario?.id === freelancerId && (
+            <Link
+              href={`/avaliar?proposta_id=${propostaId}&avaliado_id=${contratanteId}&tipo_avaliado=contratante`}
+              className="inline-block rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+            >
+              Avaliar contratante
+            </Link>
+          )}
+
+          {statusProposta === "concluida" && usuario?.id === contratanteId && (
+            <Link
+              href={`/avaliar?proposta_id=${propostaId}&avaliado_id=${freelancerId}&tipo_avaliado=freelancer`}
+              className="inline-block rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+            >
+              Avaliar freelancer
+            </Link>
+          )}
+
+          {statusProposta !== "aceita" &&
+            statusProposta !== "finalizacao_solicitada" &&
+            statusProposta !== "concluida" && (
+              <p className="text-sm text-slate-400">
+                O chat fica disponível após a proposta ser aceita.
+              </p>
+            )}
         </div>
 
         <div
