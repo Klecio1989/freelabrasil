@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AvaliacaoModal from "@/components/AvaliacaoModal";
 
 export default function ProjetosConfirmar() {
   const [usuario, setUsuario] = useState(null);
   const [projetos, setProjetos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [avaliar, setAvaliar] = useState(null);
 
   useEffect(() => {
     carregarUsuario();
@@ -35,6 +37,7 @@ export default function ProjetosConfirmar() {
         data_inicio,
         data_finalizacao,
         projeto_id,
+        freela_id,
         projetos (
           titulo,
           descricao,
@@ -55,7 +58,7 @@ export default function ProjetosConfirmar() {
     setLoading(false);
   }
 
-  async function confirmarConclusao(id) {
+  async function confirmarConclusao(item) {
     const confirmar = confirm("Confirma que o projeto foi concluído?");
     if (!confirmar) return;
 
@@ -64,7 +67,7 @@ export default function ProjetosConfirmar() {
       .update({
         status: "concluido",
       })
-      .eq("id", id);
+      .eq("id", item.id);
 
     if (error) {
       console.error(error);
@@ -73,6 +76,10 @@ export default function ProjetosConfirmar() {
     }
 
     alert("Projeto concluído com sucesso!");
+
+    // abre modal de avaliação
+    setAvaliar(item);
+
     carregarProjetos(usuario.id);
   }
 
@@ -125,7 +132,10 @@ export default function ProjetosConfirmar() {
           )}
 
           {item.status === "finalizado_freela" && (
-            <button style={button} onClick={() => confirmarConclusao(item.id)}>
+            <button
+              style={button}
+              onClick={() => confirmarConclusao(item)}
+            >
               Confirmar conclusão
             </button>
           )}
@@ -143,6 +153,15 @@ export default function ProjetosConfirmar() {
           )}
         </div>
       ))}
+
+      {/* Modal de avaliação */}
+      {avaliar && (
+        <AvaliacaoModal
+          projeto={avaliar}
+          usuario={usuario}
+          onClose={() => setAvaliar(null)}
+        />
+      )}
     </main>
   );
 }
