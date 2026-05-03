@@ -1,155 +1,327 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-export default function PerfilFreelancer() {
-  const { id } = useParams();
+type Avaliacao = {
+  id: string;
+  nota: number;
+  comentario: string;
+  created_at: string;
+  avaliador_id: string;
+};
+
+type PortfolioItem = {
+  id: string;
+  titulo: string;
+  descricao: string;
+  imagem_url?: string;
+  link_url?: string;
+};
+
+export default function PerfilPublicoFreelancer() {
+  const params = useParams();
+  const id = params?.id as string;
 
   const [freelancer, setFreelancer] = useState<any>(null);
-  const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
-  const [media, setMedia] = useState(0);
+  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (id) {
-      carregarDados();
+      carregarPerfil();
     }
   }, [id]);
 
-  async function carregarDados() {
-    // freelancer
-    const { data: user } = await supabase
+  async function carregarPerfil() {
+    setLoading(true);
+
+    const { data: user, error: userError } = await supabase
       .from("usuarios")
       .select("*")
       .eq("id", id)
+      .eq("tipo_usuario", "freelancer")
       .single();
+
+    if (userError) {
+      console.error(userError);
+      setLoading(false);
+      return;
+    }
 
     setFreelancer(user);
 
-    // avaliações
-    const { data: avals } = await supabase
+    const { data: avaliacoesData } = await supabase
       .from("avaliacoes")
       .select("*")
       .eq("avaliado_id", id)
+      .eq("tipo_avaliacao", "freelancer")
       .order("created_at", { ascending: false });
 
-    if (avals) {
-      setAvaliacoes(avals);
+    setAvaliacoes((avaliacoesData || []) as Avaliacao[]);
 
-      const mediaCalc =
-        avals.reduce((acc, item) => acc + item.nota, 0) /
-        (avals.length || 1);
+    const { data: portfolioData } = await supabase
+      .from("portfolio")
+      .select("*")
+      .eq("usuario_id", id)
+      .order("created_at", { ascending: false });
 
-      setMedia(mediaCalc);
-    }
+    setPortfolio((portfolioData || []) as PortfolioItem[]);
+
+    setLoading(false);
+  }
+
+  function mediaAvaliacoes() {
+    if (!avaliacoes.length) return 0;
+
+    const total = avaliacoes.reduce((acc, item) => acc + Number(item.nota || 0), 0);
+    return total / avaliacoes.length;
   }
 
   function renderStars(nota: number) {
+    const arredondada = Math.round(nota);
+
     return (
-      <div style={{ fontSize: 22, color: "#facc15" }}>
-        {"★".repeat(Math.round(nota))}
-        {"☆".repeat(5 - Math.round(nota))}
+      <div className="text-2xl text-yellow-400">
+        {"★".repeat(arredondada)}
+        <span className="text-slate-600">{"★".repeat(5 - arredondada)}</span>
       </div>
     );
   }
 
-  if (!freelancer) {
-    return <p style={{ padding: 30 }}>Carregando...</p>;
+  function badgePlano(plano?: string) {
+    if (plano === "pro") {
+      return (
+        <span className="rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-black text-yellow-300">
+          👑 PRO
+        </span>
+      );
+    }
+
+    if (plano === "plus") {
+      return (
+        <span className="rounded-full border border-cyan-400/40 bg-cyan-400/15 px-3 py-1 text-xs font-black text-cyan-300">
+          💎 PLUS
+        </span>
+      );
+    }
+
+    return (
+      <span className="rounded-full border border-white/10 bg-slate-700 px-3 py-1 text-xs font-bold text-white">
+        GRATUITO
+      </span>
+    );
   }
 
+  function badgeReputacao() {
+    const media = mediaAvaliacoes();
+
+    if (media >= 4.8 && avaliacoes.length >= 3) {
+      return "🏆 Top Freelancer";
+    }
+
+    if (media >= 4.5) {
+      return "⭐ Muito bem avaliado";
+    }
+
+    if (avaliacoes.length > 0) {
+      return "✅ Freelancer avaliado";
+    }
+
+    return "Novo na plataforma";
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Carregando perfil...
+      </main>
+    );
+  }
+
+  if (!freelancer) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Freelancer não encontrado.
+      </main>
+    );
+  }
+
+  const media = mediaAvaliacoes();
+
   return (
-    <main style={container}>
-      <div style={card}>
-        <div style={top}>
-          <div style={avatar}>
-            {freelancer.foto_url ? (
-              <img src={freelancer.foto_url} style={{ width: "100%" }} />
-            ) : (
-              <span>{freelancer.nome?.[0]}</span>
-            )}
-          </div>
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+      <section className="mx-auto max-w-6xl">
+        <Link
+          href="/freelancers"
+          className="mb-8 inline-block rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/5"
+        >
+          Voltar para freelancers
+        </Link>
 
-          <div>
-            <h1>{freelancer.nome}</h1>
-            <p>{freelancer.cidade}</p>
+        <div className="rounded-[2rem] border border-white/10 bg-slate-900 p-8 shadow-2xl">
+          <div className="grid gap-8 lg:grid-cols-[180px_1fr]">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-full bg-slate-700 ring-4 ring-white/10">
+                {freelancer.foto_url ? (
+                  <img
+                    src={freelancer.foto_url}
+                    alt={freelancer.nome}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-5xl font-black">
+                    {freelancer.nome?.charAt(0)?.toUpperCase() || "U"}
+                  </span>
+                )}
+              </div>
 
-            <div style={{ marginTop: 10 }}>
-              {renderStars(media)}
-              <span>
-                {media.toFixed(1)} ({avaliacoes.length} avaliações)
-              </span>
+              <div className="mt-5">{badgePlano(freelancer.plano)}</div>
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-4xl font-black">
+                  {freelancer.nome}{" "}
+                  {freelancer.plano === "pro"
+                    ? "👑"
+                    : freelancer.plano === "plus"
+                    ? "💎"
+                    : ""}
+                </h1>
+
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  {badgeReputacao()}
+                </span>
+              </div>
+
+              <p className="mt-2 text-slate-400">
+                {freelancer.cidade || "Cidade não informada"}
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-4">
+                <div>
+                  {renderStars(media)}
+                  <p className="mt-1 text-sm text-slate-400">
+                    {media.toFixed(1)} de 5 • {avaliacoes.length} avaliações
+                  </p>
+                </div>
+
+                <span className="rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-slate-300">
+                  {freelancer.projetos_concluidos || 0} projetos concluídos
+                </span>
+
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-4 py-2 text-sm font-bold text-yellow-300">
+                  Score {Number(freelancer.score_reputacao || 0).toFixed(0)}
+                </span>
+              </div>
+
+              <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h2 className="text-xl font-black">Sobre</h2>
+                <p className="mt-3 leading-8 text-slate-300">
+                  {freelancer.descricao || "Este freelancer ainda não adicionou uma descrição."}
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h2 className="text-xl font-black">Habilidades</h2>
+                <p className="mt-3 leading-8 text-slate-300">
+                  {freelancer.habilidades || "Nenhuma habilidade cadastrada."}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        <p style={{ marginTop: 20 }}>
-          {freelancer.descricao || "Sem descrição"}
-        </p>
+        <div className="mt-8 rounded-[2rem] border border-white/10 bg-slate-900 p-8">
+          <h2 className="text-3xl font-black">Portfólio</h2>
 
-        <div style={badges}>
-          <span>{freelancer.habilidades}</span>
-          <span>{freelancer.projetos_concluidos || 0} projetos</span>
-        </div>
-      </div>
+          {portfolio.length === 0 && (
+            <p className="mt-4 text-slate-400">
+              Nenhum projeto de portfólio cadastrado.
+            </p>
+          )}
 
-      <div style={card}>
-        <h2>Avaliações</h2>
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {portfolio.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-white/10 bg-slate-950 p-5"
+              >
+                {item.imagem_url && (
+                  <img
+                    src={item.imagem_url}
+                    alt={item.titulo}
+                    className="h-48 w-full rounded-xl object-cover"
+                  />
+                )}
 
-        {avaliacoes.length === 0 && (
-          <p>Nenhuma avaliação ainda.</p>
-        )}
+                <h3 className="mt-4 text-xl font-black">{item.titulo}</h3>
 
-        {avaliacoes.map((a) => (
-          <div key={a.id} style={avaliacaoCard}>
-            {renderStars(a.nota)}
-            <p>{a.comentario}</p>
+                <p className="mt-2 text-slate-300">{item.descricao}</p>
+
+                {item.link_url && (
+                  <a
+                    href={item.link_url}
+                    target="_blank"
+                    className="mt-4 inline-block rounded-xl bg-emerald-400 px-4 py-2 font-bold text-slate-950"
+                  >
+                    Abrir projeto
+                  </a>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+
+        <div className="mt-8 rounded-[2rem] border border-white/10 bg-slate-900 p-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-black">Avaliações</h2>
+              <p className="mt-2 text-slate-400">
+                Comentários reais de contratantes após projetos concluídos.
+              </p>
+            </div>
+
+            <div className="text-right">
+              {renderStars(media)}
+              <p className="mt-1 text-sm text-slate-400">
+                {media.toFixed(1)} média geral
+              </p>
+            </div>
+          </div>
+
+          {avaliacoes.length === 0 && (
+            <p className="mt-6 text-slate-400">
+              Este freelancer ainda não recebeu avaliações.
+            </p>
+          )}
+
+          <div className="mt-6 grid gap-5">
+            {avaliacoes.map((avaliacao) => (
+              <div
+                key={avaliacao.id}
+                className="rounded-2xl border border-white/10 bg-slate-950 p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {renderStars(avaliacao.nota)}
+
+                  <span className="text-sm text-slate-500">
+                    {new Date(avaliacao.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+
+                <p className="mt-4 leading-7 text-slate-300">
+                  “{avaliacao.comentario}”
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
-
-const container = {
-  maxWidth: 900,
-  margin: "0 auto",
-  padding: 30,
-};
-
-const card = {
-  background: "#fff",
-  padding: 20,
-  borderRadius: 12,
-  marginBottom: 20,
-};
-
-const top = {
-  display: "flex",
-  gap: 20,
-  alignItems: "center",
-};
-
-const avatar = {
-  width: 80,
-  height: 80,
-  borderRadius: "50%",
-  overflow: "hidden",
-  background: "#ddd",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 28,
-};
-
-const badges = {
-  marginTop: 20,
-  display: "flex",
-  gap: 10,
-};
-
-const avaliacaoCard = {
-  borderTop: "1px solid #eee",
-  marginTop: 10,
-  paddingTop: 10,
-};
