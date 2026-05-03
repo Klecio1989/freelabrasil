@@ -125,21 +125,25 @@ export default function PerfilPage() {
       setEnviandoFoto(true);
 
       const extensao = file.name.split(".").pop();
-      const nomeArquivo = `${usuario.id}-${Date.now()}.${extensao}`;
+      const nomeArquivo = `avatar-${usuario.id}-${Date.now()}.${extensao}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(nomeArquivo, file, { upsert: true });
+        .upload(nomeArquivo, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
 
       if (uploadError) {
-        alert("Erro ao enviar foto.");
+        console.error("ERRO UPLOAD AVATAR:", uploadError);
+        alert("Erro no upload: " + uploadError.message);
         return;
       }
 
       const { data } = supabase.storage.from("avatars").getPublicUrl(nomeArquivo);
 
       if (!data?.publicUrl) {
-        alert("Erro ao obter URL da foto.");
+        alert("Erro ao gerar URL da imagem.");
         return;
       }
 
@@ -151,27 +155,28 @@ export default function PerfilPage() {
         .eq("id", usuario.id);
 
       if (error) {
-        alert("Erro ao salvar foto no perfil.");
+        console.error("ERRO SALVAR FOTO BANCO:", error);
+        alert("Erro ao salvar foto no banco.");
         return;
       }
-
-      setFotoUrl(novaFoto);
 
       const usuarioAtualizado = {
         ...usuario,
         foto_url: novaFoto,
       };
 
+      setUsuario(usuarioAtualizado);
+      setFotoUrl(novaFoto);
+
       localStorage.setItem(
         "freelabrasil_usuario",
         JSON.stringify(usuarioAtualizado)
       );
 
-      setUsuario(usuarioAtualizado);
-      alert("Foto atualizada com sucesso.");
+      alert("Foto atualizada com sucesso!");
     } catch (error) {
-      console.error(error);
-      alert("Erro ao enviar foto.");
+      console.error("ERRO INESPERADO FOTO:", error);
+      alert("Erro inesperado ao enviar imagem.");
     } finally {
       setEnviandoFoto(false);
       if (event.target) event.target.value = "";
@@ -211,7 +216,10 @@ export default function PerfilPage() {
           return;
         }
 
-        const { data } = supabase.storage.from("portfolio").getPublicUrl(nomeArquivo);
+        const { data } = supabase.storage
+          .from("portfolio")
+          .getPublicUrl(nomeArquivo);
+
         imagemUrl = data.publicUrl;
       }
 
@@ -471,9 +479,7 @@ export default function PerfilPage() {
               )}
 
               {enviandoFoto && (
-                <p className="mt-2 text-xs text-emerald-300">
-                  Enviando foto...
-                </p>
+                <p className="mt-2 text-xs text-emerald-300">Enviando foto...</p>
               )}
 
               <h2 className="text-2xl font-bold mt-4">{usuario.nome}</h2>
@@ -545,9 +551,7 @@ export default function PerfilPage() {
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <div className="bg-slate-800 rounded-xl p-5">
-                      <h3 className="text-2xl font-bold">
-                        Projetos do portfólio
-                      </h3>
+                      <h3 className="text-2xl font-bold">Projetos do portfólio</h3>
 
                       {portfolio.length === 0 && (
                         <p className="mt-3 text-slate-400">
@@ -720,9 +724,7 @@ export default function PerfilPage() {
                   )}
 
                   <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
-                    <h3 className="text-lg font-bold">
-                      Alterar senha opcional
-                    </h3>
+                    <h3 className="text-lg font-bold">Alterar senha opcional</h3>
 
                     <p className="text-sm text-slate-400">
                       Preencha apenas se quiser trocar sua senha.
