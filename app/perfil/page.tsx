@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
 
@@ -15,6 +15,8 @@ type PortfolioItem = {
 };
 
 export default function PerfilPage() {
+  const inputFotoRef = useRef<HTMLInputElement | null>(null);
+
   const [usuario, setUsuario] = useState<any>(null);
   const [editando, setEditando] = useState(false);
 
@@ -103,9 +105,21 @@ export default function PerfilPage() {
     return "border-white/10 bg-slate-900";
   }
 
+  function abrirSeletorFoto() {
+    if (!editando) return;
+    inputFotoRef.current?.click();
+  }
+
   async function uploadFoto(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !usuario) return;
+
+    const tiposPermitidos = ["image/png", "image/jpeg", "image/jpg"];
+
+    if (!tiposPermitidos.includes(file.type)) {
+      alert("Selecione uma imagem PNG ou JPG.");
+      return;
+    }
 
     try {
       setEnviandoFoto(true);
@@ -148,15 +162,19 @@ export default function PerfilPage() {
         foto_url: novaFoto,
       };
 
-      localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuarioAtualizado));
-      setUsuario(usuarioAtualizado);
+      localStorage.setItem(
+        "freelabrasil_usuario",
+        JSON.stringify(usuarioAtualizado)
+      );
 
+      setUsuario(usuarioAtualizado);
       alert("Foto atualizada com sucesso.");
     } catch (error) {
       console.error(error);
       alert("Erro ao enviar foto.");
     } finally {
       setEnviandoFoto(false);
+      if (event.target) event.target.value = "";
     }
   }
 
@@ -174,6 +192,13 @@ export default function PerfilPage() {
       let imagemUrl = "";
 
       if (portfolioImagem) {
+        const tiposPermitidos = ["image/png", "image/jpeg", "image/jpg"];
+
+        if (!tiposPermitidos.includes(portfolioImagem.type)) {
+          alert("A imagem do portfólio precisa ser PNG ou JPG.");
+          return;
+        }
+
         const extensao = portfolioImagem.name.split(".").pop();
         const nomeArquivo = `${usuario.id}/${Date.now()}.${extensao}`;
 
@@ -249,7 +274,14 @@ export default function PerfilPage() {
       return;
     }
 
-    if (novaSenha || confirmarNovaSenha || senhaAtual) {
+    const querAlterarSenha = novaSenha.trim() || confirmarNovaSenha.trim();
+
+    if (querAlterarSenha) {
+      if (!senhaAtual.trim()) {
+        alert("Informe a senha atual para alterar a senha.");
+        return;
+      }
+
       if (senhaAtual !== usuario.senha) {
         alert("Senha atual inválida.");
         return;
@@ -279,7 +311,7 @@ export default function PerfilPage() {
         cidade,
       };
 
-      if (novaSenha) {
+      if (querAlterarSenha) {
         payload.senha = novaSenha;
       }
 
@@ -298,12 +330,17 @@ export default function PerfilPage() {
         ...payload,
       };
 
-      localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuarioAtualizado));
+      localStorage.setItem(
+        "freelabrasil_usuario",
+        JSON.stringify(usuarioAtualizado)
+      );
+
       setUsuario(usuarioAtualizado);
       setSenhaAtual("");
       setNovaSenha("");
       setConfirmarNovaSenha("");
       setEditando(false);
+
       alert("Perfil atualizado com sucesso.");
     } catch (error) {
       console.error(error);
@@ -375,7 +412,7 @@ export default function PerfilPage() {
           <div className="flex gap-3">
             {usuario.tipo_usuario === "freelancer" && (
               <Link
-                href={`/freelancer/${usuario.id}`}
+                href={`/freelancers/${usuario.id}`}
                 className="bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold"
               >
                 Ver página pública
@@ -383,7 +420,11 @@ export default function PerfilPage() {
             )}
 
             <Link
-              href={usuario.tipo_usuario === "freelancer" ? "/painel-freelancer" : "/painel-contratante"}
+              href={
+                usuario.tipo_usuario === "freelancer"
+                  ? "/painel-freelancer"
+                  : "/painel-contratante"
+              }
               className="border border-white/20 px-4 py-2 rounded-lg"
             >
               Voltar
@@ -394,7 +435,22 @@ export default function PerfilPage() {
         <div className={`rounded-2xl border p-8 ${cardDestaque(usuario.plano)}`}>
           <div className="grid lg:grid-cols-[220px_1fr] gap-8">
             <div className="bg-slate-800 rounded-2xl p-6 flex flex-col items-center text-center">
-              <div className="w-32 h-32 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+              <input
+                ref={inputFotoRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                onChange={uploadFoto}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={abrirSeletorFoto}
+                className={`w-32 h-32 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center border border-white/10 ${
+                  editando ? "cursor-pointer hover:opacity-80" : "cursor-default"
+                }`}
+                title={editando ? "Clique para alterar a foto" : ""}
+              >
                 {fotoUrl ? (
                   <img
                     src={fotoUrl}
@@ -406,7 +462,19 @@ export default function PerfilPage() {
                     {usuario.nome?.charAt(0)?.toUpperCase() || "U"}
                   </span>
                 )}
-              </div>
+              </button>
+
+              {editando && (
+                <p className="mt-3 text-xs text-slate-400">
+                  Clique na foto/inicial para enviar PNG ou JPG.
+                </p>
+              )}
+
+              {enviandoFoto && (
+                <p className="mt-2 text-xs text-emerald-300">
+                  Enviando foto...
+                </p>
+              )}
 
               <h2 className="text-2xl font-bold mt-4">{usuario.nome}</h2>
               <p className="text-slate-400 mt-1">{usuario.email}</p>
@@ -431,12 +499,16 @@ export default function PerfilPage() {
 
                     <div className="bg-slate-800 rounded-xl p-5">
                       <p className="text-sm text-slate-400">Cidade</p>
-                      <p className="text-xl font-bold mt-1">{usuario.cidade || "-"}</p>
+                      <p className="text-xl font-bold mt-1">
+                        {usuario.cidade || "-"}
+                      </p>
                     </div>
 
                     <div className="bg-slate-800 rounded-xl p-5">
                       <p className="text-sm text-slate-400">Plano</p>
-                      <p className="text-xl font-bold mt-1 capitalize">{usuario.plano || "gratuito"}</p>
+                      <p className="text-xl font-bold mt-1 capitalize">
+                        {usuario.plano || "gratuito"}
+                      </p>
                     </div>
                   </div>
 
@@ -473,7 +545,9 @@ export default function PerfilPage() {
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <div className="bg-slate-800 rounded-xl p-5">
-                      <h3 className="text-2xl font-bold">Projetos do portfólio</h3>
+                      <h3 className="text-2xl font-bold">
+                        Projetos do portfólio
+                      </h3>
 
                       {portfolio.length === 0 && (
                         <p className="mt-3 text-slate-400">
@@ -495,7 +569,10 @@ export default function PerfilPage() {
                               />
                             )}
 
-                            <h4 className="mt-4 text-xl font-bold">{item.titulo}</h4>
+                            <h4 className="mt-4 text-xl font-bold">
+                              {item.titulo}
+                            </h4>
+
                             <p className="mt-2 text-sm text-slate-300">
                               {item.descricao}
                             </p>
@@ -548,21 +625,55 @@ export default function PerfilPage() {
                 </>
               ) : (
                 <div className="space-y-5">
-                  <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                  <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                  <input value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} placeholder="URL do portfólio externo" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Nome"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
 
-                  <input type="file" accept="image/*" onChange={uploadFoto} className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
 
-                  {enviandoFoto && <p className="text-sm text-slate-400">Enviando foto...</p>}
+                  <input
+                    value={cidade}
+                    onChange={(e) => setCidade(e.target.value)}
+                    placeholder="Cidade"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
 
-                  <textarea value={habilidades} onChange={(e) => setHabilidades(e.target.value)} rows={3} placeholder="Habilidades" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                  <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={5} placeholder="Descrição" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input
+                    value={portfolioUrl}
+                    onChange={(e) => setPortfolioUrl(e.target.value)}
+                    placeholder="URL do portfólio externo"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
+
+                  <textarea
+                    value={habilidades}
+                    onChange={(e) => setHabilidades(e.target.value)}
+                    rows={3}
+                    placeholder="Habilidades"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
+
+                  <textarea
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    rows={5}
+                    placeholder="Descrição"
+                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                  />
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
-                      <h3 className="text-lg font-bold">Adicionar projeto ao portfólio</h3>
+                      <h3 className="text-lg font-bold">
+                        Adicionar projeto ao portfólio
+                      </h3>
 
                       <input
                         value={portfolioTitulo}
@@ -589,8 +700,10 @@ export default function PerfilPage() {
                       <input
                         id="portfolio-imagem"
                         type="file"
-                        accept="image/*"
-                        onChange={(e) => setPortfolioImagem(e.target.files?.[0] || null)}
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={(e) =>
+                          setPortfolioImagem(e.target.files?.[0] || null)
+                        }
                         className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
                       />
 
@@ -599,21 +712,53 @@ export default function PerfilPage() {
                         disabled={salvandoPortfolio}
                         className="rounded-xl bg-purple-500 px-6 py-3 font-bold text-white disabled:opacity-60"
                       >
-                        {salvandoPortfolio ? "Salvando projeto..." : "Adicionar ao portfólio"}
+                        {salvandoPortfolio
+                          ? "Salvando projeto..."
+                          : "Adicionar ao portfólio"}
                       </button>
                     </div>
                   )}
 
                   <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
-                    <h3 className="text-lg font-bold">Alterar senha</h3>
+                    <h3 className="text-lg font-bold">
+                      Alterar senha opcional
+                    </h3>
 
-                    <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} placeholder="Senha atual" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                    <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Nova senha" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
-                    <input type="password" value={confirmarNovaSenha} onChange={(e) => setConfirmarNovaSenha(e.target.value)} placeholder="Confirmar nova senha" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                    <p className="text-sm text-slate-400">
+                      Preencha apenas se quiser trocar sua senha.
+                    </p>
+
+                    <input
+                      type="password"
+                      value={senhaAtual}
+                      onChange={(e) => setSenhaAtual(e.target.value)}
+                      placeholder="Senha atual"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
+
+                    <input
+                      type="password"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      placeholder="Nova senha"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
+
+                    <input
+                      type="password"
+                      value={confirmarNovaSenha}
+                      onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                      placeholder="Confirmar nova senha"
+                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
+                    />
                   </div>
 
                   <div className="flex gap-4">
-                    <button onClick={salvarPerfil} disabled={salvando} className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg disabled:opacity-60">
+                    <button
+                      onClick={salvarPerfil}
+                      disabled={salvando}
+                      className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg disabled:opacity-60"
+                    >
                       {salvando ? "Salvando..." : "Salvar"}
                     </button>
 
