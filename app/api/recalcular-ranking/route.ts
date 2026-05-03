@@ -1,56 +1,87 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 export async function POST() {
   try {
-    const { data: freelancers, error } = await supabase
+    const { data: freelancers, error: freelancersError } = await supabase
       .from("usuarios")
-      .select("id,plano,nota_media,projetos_concluidos,tempo_resposta_horas,tipo_usuario")
+      .select("id, plano")
       .eq("tipo_usuario", "freelancer");
 
-    if (error || !freelancers) {
+    if (freelancersError) {
       return NextResponse.json(
-        { error: "Erro ao buscar freelancers" },
+        { error: freelancersError.message },
         { status: 500 }
       );
     }
 
-    for (const f of freelancers) {
-      const planoPeso =
-        f.plano === "pro" ? 30 :
-        f.plano === "plus" ? 15 :
-        0;
-
-      const nota = Number(f.nota_media || 0) * 10;
-      const concluidos = Math.min(Number(f.projetos_concluidos || 0) * 2, 40);
-
-      const tempoResposta = Number(f.tempo_resposta_horas || 999);
-      let bonusResposta = 0;
-
-      if (tempoResposta <= 1) bonusResposta = 20;
-      else if (tempoResposta <= 6) bonusResposta = 15;
-      else if (tempoResposta <= 24) bonusResposta = 10;
-      else if (tempoResposta <= 48) bonusResposta = 5;
-      else bonusResposta = 0;
-
-      const score = planoPeso + nota + concluidos + bonusResposta;
-
-      await supabase
-        .from("usuarios")
-        .update({ score_reputacao: score })
-        .eq("id", f.id);
+    if (!freelancers || freelancers.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "Nenhum freelancer encontrado.",
+      });
     }
 
-    return NextResponse.json({ ok: true });
+    for (const freelancer of freelancers) {
+      const { data: avaliacoes, error: avaliacoesError } = await supabase
+        .from("avaliacoes")
+        .select("nota")
+        .eq("avaliado_id", freelancer.id);
+
+      if (avaliacoesError) {
+        console.error("Erro ao buscar avaliações:", avaliacoesError);
+        continue;
+      }
+
+      const totalAvaliacoes = avaliacoes?.length || 0;
+
+      const notaMedia =
+        totalAvaliacoes > 0
+          ? avaliacoes.reduce((acc, item) => acc + Number(item.nota || 0), 0) /
+            totalAvaliacoes
+          : 0;
+
+      const { count: projetosConcluidos, error: projetosError } = await supabase
+        .from("projetos_andamento")
+        .select("*", { count: "exact", head: true })
+        .eq("freela_id", freelancer.id)
+        .eq("status", "concluido");
+
+      if (projetosError) {
+        console.error("Erro ao buscar projetos concluídos:", projetosError);
+      }
+
+      let bonusPlano = 0;
+
+      if (freelancer.plano === "plus") bonusPlano = 10;
+      if (freelancer.plano === "pro") bonusPlano = 20;
+
+      const scoreReputacao =
+        notaMedia * 20 + (projetosConcluidos || 0) * 5 + bonusPlano;
+
+      const { error: updateError } = await supabase
+        .from("usuarios")
+        .update({
+          nota_media: Number(notaMedia.toFixed(2)),
+          projetos_concluidos: projetosConcluidos || 0,
+          score_reputacao: Number(scoreReputacao.toFixed(2)),
+        })
+        .eq("id", freelancer.id);
+
+      if (updateError) {
+        console.error("Erro ao atualizar ranking:", updateError);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Ranking recalculado com sucesso.",
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Erro geral ao recalcular ranking:", error);
+
     return NextResponse.json(
-      { error: "Erro interno ao recalcular ranking" },
+      { error: "Erro ao recalcular ranking." },
       { status: 500 }
     );
   }
