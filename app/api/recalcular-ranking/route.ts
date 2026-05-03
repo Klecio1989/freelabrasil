@@ -37,8 +37,10 @@ export async function POST() {
 
       const notaMedia =
         totalAvaliacoes > 0
-          ? avaliacoes.reduce((acc, item) => acc + Number(item.nota || 0), 0) /
-            totalAvaliacoes
+          ? avaliacoes.reduce(
+              (acc: number, item: any) => acc + Number(item.nota || 0),
+              0
+            ) / totalAvaliacoes
           : 0;
 
       const { count: projetosConcluidos, error: projetosError } = await supabase
@@ -53,11 +55,11 @@ export async function POST() {
 
       let bonusPlano = 0;
 
-      if (freelancer.plano === "plus") bonusPlano = 10;
-      if (freelancer.plano === "pro") bonusPlano = 20;
+      if (freelancer.plano === "plus") bonusPlano = 50;
+      if (freelancer.plano === "pro") bonusPlano = 100;
 
       const scoreReputacao =
-        notaMedia * 20 + (projetosConcluidos || 0) * 5 + bonusPlano;
+        notaMedia * 30 + (projetosConcluidos || 0) * 10 + bonusPlano;
 
       const { error: updateError } = await supabase
         .from("usuarios")
@@ -69,13 +71,13 @@ export async function POST() {
         .eq("id", freelancer.id);
 
       if (updateError) {
-        console.error("Erro ao atualizar ranking:", updateError);
+        console.error("Erro ao atualizar freelancer:", updateError);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Ranking recalculado com sucesso.",
+      message: "Ranking atualizado com sucesso.",
     });
   } catch (error) {
     console.error("Erro geral ao recalcular ranking:", error);

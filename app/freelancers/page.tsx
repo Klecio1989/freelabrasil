@@ -37,6 +37,7 @@ export default function FreelancersPage() {
 
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+
     if (usuarioSalvo) {
       const parsed = JSON.parse(usuarioSalvo);
       setUsuario(parsed);
@@ -56,7 +57,7 @@ export default function FreelancersPage() {
   }
 
   async function carregarFreelancers() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("usuarios")
       .select(
         "id,nome,cidade,foto_url,descricao,habilidades,plano,nota_media,projetos_concluidos,score_reputacao,tipo_usuario"
@@ -64,9 +65,13 @@ export default function FreelancersPage() {
       .eq("tipo_usuario", "freelancer")
       .order("score_reputacao", { ascending: false });
 
-    if (!data) return;
+    if (error) {
+      console.error(error);
+      alert("Erro ao carregar freelancers.");
+      return;
+    }
 
-    setFreelancers(data as Freelancer[]);
+    setFreelancers((data || []) as Freelancer[]);
   }
 
   async function carregarFavoritos(contratanteId: string) {
@@ -76,6 +81,7 @@ export default function FreelancersPage() {
       .eq("contratante_id", contratanteId);
 
     if (!data) return;
+
     setFavoritos(data.map((item: any) => item.freelancer_id));
   }
 
@@ -167,8 +173,10 @@ export default function FreelancersPage() {
         `${f.nome || ""} ${f.cidade || ""} ${f.habilidades || ""} ${f.descricao || ""}`.toLowerCase();
 
       const bateBusca = busca ? texto.includes(busca.toLowerCase()) : true;
+
       const batePlano =
         filtroPlano === "todos" ? true : (f.plano || "gratuito") === filtroPlano;
+
       const bateCidade = filtroCidade
         ? (f.cidade || "").toLowerCase().includes(filtroCidade.toLowerCase())
         : true;
@@ -177,22 +185,52 @@ export default function FreelancersPage() {
     });
   }, [freelancers, busca, filtroPlano, filtroCidade]);
 
+  function iconePlano(plano?: string) {
+    if (plano === "pro") return "👑";
+    if (plano === "plus") return "💎";
+    return "";
+  }
+
   function badgePlano(plano?: string) {
     if (plano === "pro") {
-      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
+      return (
+        <span className="rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-black text-yellow-300 shadow-lg shadow-yellow-500/10">
+          👑 PRO
+        </span>
+      );
     }
 
     if (plano === "plus") {
-      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
+      return (
+        <span className="rounded-full border border-cyan-400/40 bg-cyan-400/15 px-3 py-1 text-xs font-black text-cyan-300 shadow-lg shadow-cyan-500/10">
+          💎 PLUS
+        </span>
+      );
     }
 
-    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
+    return (
+      <span className="rounded-full border border-white/10 bg-slate-700 px-3 py-1 text-xs font-bold text-white">
+        GRATUITO
+      </span>
+    );
   }
 
   function cardDestaque(plano?: string) {
-    if (plano === "pro") return "border-purple-500/40 bg-purple-500/5";
-    if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/5";
+    if (plano === "pro") {
+      return "border-yellow-400/50 bg-yellow-400/10 shadow-yellow-500/20";
+    }
+
+    if (plano === "plus") {
+      return "border-cyan-400/40 bg-cyan-400/10 shadow-cyan-500/10";
+    }
+
     return "border-white/10 bg-white/5";
+  }
+
+  function textoRanking(plano?: string) {
+    if (plano === "pro") return "Destaque máximo";
+    if (plano === "plus") return "Destaque avançado";
+    return "Perfil gratuito";
   }
 
   return (
@@ -219,14 +257,14 @@ export default function FreelancersPage() {
               <div className="mt-1 text-2xl font-black">{freelancersFiltrados.length}</div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Ranking</div>
-              <div className="mt-1 text-2xl font-black">Automático</div>
+            <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-5 py-4">
+              <div className="text-sm text-yellow-200">PRO</div>
+              <div className="mt-1 text-2xl font-black">👑 Topo</div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Prioridade</div>
-              <div className="mt-1 text-2xl font-black">Pro / Plus</div>
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-4">
+              <div className="text-sm text-cyan-200">PLUS</div>
+              <div className="mt-1 text-2xl font-black">💎 Destaque</div>
             </div>
           </div>
         </div>
@@ -245,8 +283,8 @@ export default function FreelancersPage() {
             className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
           >
             <option value="todos">Todos os planos</option>
-            <option value="pro">Pro</option>
-            <option value="plus">Plus</option>
+            <option value="pro">👑 Pro</option>
+            <option value="plus">💎 Plus</option>
             <option value="gratuito">Gratuito</option>
           </select>
 
@@ -280,7 +318,7 @@ export default function FreelancersPage() {
               >
                 <div className="grid gap-6 lg:grid-cols-[100px_1fr_auto] lg:items-center">
                   <div className="flex justify-center">
-                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-slate-700">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-slate-700 ring-2 ring-white/10">
                       {f.foto_url ? (
                         <img
                           src={f.foto_url}
@@ -298,10 +336,22 @@ export default function FreelancersPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-sm text-slate-400">#{index + 1}</span>
-                      <h2 className="text-2xl font-black">{f.nome}</h2>
+
+                      <h2 className="text-2xl font-black">
+                        {f.nome}{" "}
+                        <span title={f.plano === "pro" ? "Plano Pro" : "Plano Plus"}>
+                          {iconePlano(f.plano)}
+                        </span>
+                      </h2>
+
                       {badgePlano(f.plano)}
+
                       <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
                         SCORE {Number(f.score_reputacao || 0).toFixed(0)}
+                      </span>
+
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
+                        {textoRanking(f.plano)}
                       </span>
                     </div>
 
@@ -328,7 +378,7 @@ export default function FreelancersPage() {
 
                   <div className="flex min-w-[230px] flex-col gap-3">
                     <Link
-                      href={`/freelancer/${f.id}`}
+                      href={`/freelancers/${f.id}`}
                       className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02]"
                     >
                       Ver perfil
@@ -366,6 +416,7 @@ export default function FreelancersPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
             <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-slate-900 p-8">
               <h2 className="text-3xl font-black">Enviar convite</h2>
+
               <p className="mt-2 text-slate-400">
                 Escolha um projeto e envie uma mensagem ao freelancer.
               </p>
