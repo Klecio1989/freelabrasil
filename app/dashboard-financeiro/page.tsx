@@ -8,6 +8,7 @@ export default function DashboardFinanceiro() {
   const [usuario, setUsuario] = useState<any>(null);
   const [pagamentos, setPagamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
 
   const [resumo, setResumo] = useState({
     totalBruto: 0,
@@ -22,6 +23,9 @@ export default function DashboardFinanceiro() {
   }, []);
 
   async function carregarDashboard() {
+    setLoading(true);
+    setErro("");
+
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
     if (!usuarioSalvo) {
@@ -48,8 +52,10 @@ export default function DashboardFinanceiro() {
     const { data, error } = await query;
 
     if (error) {
-      console.error(error);
-      alert("Erro ao carregar dashboard financeiro.");
+      console.error("Erro Supabase dashboard financeiro:", error);
+      setErro("Não foi possível carregar as movimentações financeiras agora.");
+      setPagamentos([]);
+      calcularResumo([], parsed.tipo_usuario);
       setLoading(false);
       return;
     }
@@ -57,7 +63,6 @@ export default function DashboardFinanceiro() {
     const lista = data || [];
     setPagamentos(lista);
     calcularResumo(lista, parsed.tipo_usuario);
-
     setLoading(false);
   }
 
@@ -103,14 +108,8 @@ export default function DashboardFinanceiro() {
   }
 
   function tituloDashboard() {
-    if (usuario?.tipo_usuario === "freelancer") {
-      return "Meus Ganhos";
-    }
-
-    if (usuario?.tipo_usuario === "contratante") {
-      return "Meus Pagamentos";
-    }
-
+    if (usuario?.tipo_usuario === "freelancer") return "Meus Ganhos";
+    if (usuario?.tipo_usuario === "contratante") return "Meus Pagamentos";
     return "Dashboard Financeiro";
   }
 
@@ -127,14 +126,8 @@ export default function DashboardFinanceiro() {
   }
 
   function voltarPainel() {
-    if (usuario?.tipo_usuario === "freelancer") {
-      return "/painel-freelancer";
-    }
-
-    if (usuario?.tipo_usuario === "contratante") {
-      return "/painel-contratante";
-    }
-
+    if (usuario?.tipo_usuario === "freelancer") return "/painel-freelancer";
+    if (usuario?.tipo_usuario === "contratante") return "/painel-contratante";
     return "/";
   }
 
@@ -161,6 +154,12 @@ export default function DashboardFinanceiro() {
           <div>
             <h1 className="text-4xl font-black">{tituloDashboard()}</h1>
             <p className="mt-3 text-slate-400">{descricaoDashboard()}</p>
+
+            {erro && (
+              <p className="mt-3 rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm font-bold text-yellow-300">
+                {erro}
+              </p>
+            )}
           </div>
 
           <Link
@@ -242,10 +241,7 @@ export default function DashboardFinanceiro() {
                     </>
                   )}
 
-                  <Info
-                    titulo="Taxa"
-                    valor={`${Number(p.taxa_percentual || 5)}%`}
-                  />
+                  <Info titulo="Taxa" valor={`${Number(p.taxa_percentual || 5)}%`} />
 
                   <div>
                     <p className="text-sm text-slate-400">Status</p>
@@ -263,8 +259,7 @@ export default function DashboardFinanceiro() {
 
                 {p.created_at && (
                   <p className="mt-4 text-xs text-slate-500">
-                    Criado em{" "}
-                    {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                    Criado em {new Date(p.created_at).toLocaleDateString("pt-BR")}
                   </p>
                 )}
               </div>
