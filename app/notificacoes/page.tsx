@@ -1,83 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 import Link from "next/link";
-
-type Notificacao = {
-  id: string;
-  titulo: string;
-  descricao: string;
-  lida: boolean;
-  link?: string;
-  created_at: string;
-  usuario_id: string;
-};
+import { supabase } from "@/lib/supabase";
 
 export default function NotificacoesPage() {
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
+  const [notificacoes, setNotificacoes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (!usuarioSalvo) return;
+
+    if (!usuarioSalvo) {
+      setLoading(false);
+      return;
+    }
 
     const parsed = JSON.parse(usuarioSalvo);
     setUsuario(parsed);
-    carregarNotificacoes(parsed.id);
 
-    const channel = supabase
-      .channel(`notificacoes-${parsed.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notificacoes",
-          filter: `usuario_id=eq.${parsed.id}`,
-        },
-        (payload) => {
-          const nova = payload.new as Notificacao;
-          setNotificacoes((prev) => [nova, ...prev]);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "notificacoes",
-          filter: `usuario_id=eq.${parsed.id}`,
-        },
-        (payload) => {
-          const atualizada = payload.new as Notificacao;
-          setNotificacoes((prev) =>
-            prev.map((n) => (n.id === atualizada.id ? atualizada : n))
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  async function carregarNotificacoes(usuarioId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notificacoes")
       .select("*")
-      .eq("usuario_id", usuarioId)
+      .eq("usuario_id", parsed.id)
       .order("created_at", { ascending: false });
 
-    if (data) setNotificacoes(data as Notificacao[]);
+    if (error) {
+      console.error(error);
+      setNotificacoes([]);
+    } else {
+      setNotificacoes(data || []);
+    }
+
+    setLoading(false);
   }
 
   async function marcarComoLida(id: string) {
-    await supabase
-      .from("notificacoes")
-      .update({ lida: true })
-      .eq("id", id);
+    await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
 
     setNotificacoes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
@@ -90,116 +54,153 @@ export default function NotificacoesPage() {
     await supabase
       .from("notificacoes")
       .update({ lida: true })
-      .eq("usuario_id", usuario.id)
-      .eq("lida", false);
+      .eq("usuario_id", usuario.id);
 
     setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
   }
 
+  function linkNotificacao(n: any) {
+    if (
+      String(n.titulo || "").toLowerCase().includes("avaliação") ||
+      String(n.descricao || "").toLowerCase().includes("avaliou")
+    ) {
+      return "/minhas-avaliacoes";
+    }
+
+    return n.link || "/notificacoes";
+  }
+
+  function voltarPainel() {
+    if (usuario?.tipo_usuario === "freelancer") return "/painel-freelancer";
+    if (usuario?.tipo_usuario === "contratante") return "/painel-contratante";
+    return "/";
+  }
+
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
 
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Carregando...
+      </main>
+    );
+  }
+
+  if (!usuario) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Você precisa estar logado.
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-10 gap-4 flex-wrap">
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+      <section className="mx-auto max-w-6xl">
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold">Notificações</h1>
-            <p className="text-slate-400 mt-2">
+            <h1 className="text-4xl font-black">Notificações</h1>
+            <p className="mt-3 text-slate-400">
               Acompanhe atualizações da plataforma em tempo real
             </p>
           </div>
 
           <div className="flex gap-3">
-            {naoLidas > 0 && (
-              <button
-                onClick={marcarTodasComoLidas}
-                className="bg-white text-black px-4 py-2 rounded-lg font-bold"
-              >
-                Marcar todas como lidas
-              </button>
-            )}
+            <button
+              onClick={marcarTodasComoLidas}
+              className="rounded-xl bg-white px-5 py-3 font-bold text-black"
+            >
+              Marcar todas como lidas
+            </button>
 
             <Link
-              href="/dashboard"
-              className="border border-white/20 px-4 py-2 rounded-lg"
+              href={voltarPainel()}
+              className="rounded-xl border border-white/20 px-5 py-3 font-bold"
             >
               Voltar
             </Link>
           </div>
         </div>
 
-        <div className="mb-6 grid md:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-slate-400">Total</div>
-            <div className="mt-2 text-2xl font-black">{notificacoes.length}</div>
-          </div>
-
-          <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-5">
-            <div className="text-sm text-slate-400">Não lidas</div>
-            <div className="mt-2 text-2xl font-black">{naoLidas}</div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5">
-            <div className="text-sm text-slate-400">Tempo real</div>
-            <div className="mt-2 text-2xl font-black">Ativo</div>
-          </div>
+        <div className="mb-8 grid gap-4 md:grid-cols-3">
+          <Card titulo="Total" valor={String(notificacoes.length)} />
+          <Card titulo="Não lidas" valor={String(naoLidas)} />
+          <Card titulo="Tempo real" valor="Ativo" destaque />
         </div>
 
-        <div className="grid gap-6">
+        {notificacoes.length === 0 && (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            Nenhuma notificação encontrada.
+          </div>
+        )}
+
+        <div className="grid gap-5">
           {notificacoes.map((n) => (
             <div
               key={n.id}
-              className={`rounded-2xl border p-6 ${
+              className={`rounded-3xl border p-6 ${
                 n.lida
                   ? "border-white/10 bg-slate-900"
-                  : "border-emerald-400/40 bg-emerald-400/5"
+                  : "border-emerald-400/30 bg-emerald-400/10"
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold">{n.titulo}</h2>
-                  <p className="text-slate-300 mt-3">{n.descricao}</p>
-                  <p className="text-xs text-slate-500 mt-4">
-                    {new Date(n.created_at).toLocaleString("pt-BR")}
-                  </p>
-                </div>
+              <h2 className="text-2xl font-black">
+                {n.titulo || "Notificação"}
+              </h2>
 
-                {!n.lida && (
-                  <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-                    Nova
-                  </span>
-                )}
-              </div>
+              <p className="mt-4 text-slate-200">{n.descricao}</p>
 
-              <div className="flex gap-3 mt-6">
+              {n.created_at && (
+                <p className="mt-4 text-sm text-slate-500">
+                  {new Date(n.created_at).toLocaleString("pt-BR")}
+                </p>
+              )}
+
+              <div className="mt-6 flex gap-3">
+                <Link
+                  href={linkNotificacao(n)}
+                  onClick={() => marcarComoLida(n.id)}
+                  className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+                >
+                  Abrir
+                </Link>
+
                 {!n.lida && (
                   <button
                     onClick={() => marcarComoLida(n.id)}
-                    className="bg-white text-black px-4 py-2 rounded-lg font-bold"
+                    className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-black"
                   >
                     Marcar como lida
                   </button>
                 )}
-
-                {n.link && (
-                  <Link
-                    href={n.link}
-                    className="border border-white/20 px-4 py-2 rounded-lg"
-                  >
-                    Abrir
-                  </Link>
-                )}
               </div>
             </div>
           ))}
-
-          {notificacoes.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center text-slate-400">
-              Nenhuma notificação ainda.
-            </div>
-          )}
         </div>
-      </div>
+      </section>
     </main>
+  );
+}
+
+function Card({
+  titulo,
+  valor,
+  destaque,
+}: {
+  titulo: string;
+  valor: string;
+  destaque?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-5 ${
+        destaque
+          ? "border-emerald-400/30 bg-emerald-400/10"
+          : "border-white/10 bg-white/5"
+      }`}
+    >
+      <p className="text-sm text-slate-400">{titulo}</p>
+      <p className="mt-2 text-2xl font-black">{valor}</p>
+    </div>
   );
 }
