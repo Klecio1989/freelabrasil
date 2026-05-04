@@ -51,6 +51,24 @@ export default function LoginPage() {
         return;
       }
 
+      if (usuario.status_conta === "banido") {
+        alert(
+          usuario.motivo_banimento ||
+            "Sua conta foi banida por violação dos termos da plataforma."
+        );
+        return;
+      }
+
+      if (usuario.email_verificado === false) {
+        alert("Confirme seu email antes de acessar a plataforma.");
+        return;
+      }
+
+      if (usuario.aceite_termos === false || usuario.aceite_comissao === false) {
+        alert("Sua conta precisa aceitar os termos atualizados da plataforma.");
+        return;
+      }
+
       localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuario));
 
       if (usuario.tipo_usuario === "freelancer") {
@@ -81,19 +99,18 @@ export default function LoginPage() {
           </span>
 
           <h1 className="mt-6 text-5xl font-black leading-tight">
-            Entre na FreelaBrasil e continue seus negócios.
+            Entre na FreellaBrasil e continue seus negócios.
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            Acompanhe projetos, propostas, convites, favoritos, notificações e desempenho da sua conta em um só lugar.
+            Acompanhe projetos, propostas, convites, favoritos, notificações,
+            avaliações, financeiro e desempenho da sua conta em um só lugar.
           </p>
         </div>
 
         <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl">
           <h2 className="text-3xl font-black">Login</h2>
-          <p className="mt-2 text-slate-400">
-            Entre com seu email e senha.
-          </p>
+          <p className="mt-2 text-slate-400">Entre com seu email e senha.</p>
 
           <div className="mt-8 space-y-5">
             <div>
@@ -139,7 +156,10 @@ export default function LoginPage() {
 
               <p>
                 Esqueceu sua senha?{" "}
-                <Link href="/esqueci-senha" className="font-semibold text-yellow-300">
+                <Link
+                  href="/esqueci-senha"
+                  className="font-semibold text-yellow-300"
+                >
                   Redefinir senha
                 </Link>
               </p>
