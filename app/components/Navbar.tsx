@@ -2,17 +2,49 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
   const [usuario, setUsuario] = useState<any>(null);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [saldoDisponivel, setSaldoDisponivel] = useState(0);
 
   useEffect(() => {
     const user = localStorage.getItem("freelabrasil_usuario");
+
     if (user) {
-      setUsuario(JSON.parse(user));
+      const parsed = JSON.parse(user);
+      setUsuario(parsed);
+
+      if (parsed.tipo_usuario === "freelancer") {
+        carregarSaldo(parsed.id);
+      }
     }
   }, []);
+
+  async function carregarSaldo(freelaId: string) {
+    const { data: pagamentos } = await supabase
+      .from("pagamentos")
+      .select("valor_freelancer")
+      .eq("freela_id", freelaId)
+      .eq("status", "liberado");
+
+    const { data: saques } = await supabase
+      .from("saques")
+      .select("valor,status")
+      .eq("freela_id", freelaId);
+
+    const totalLiberado = (pagamentos || []).reduce(
+      (acc: number, item: any) => acc + Number(item.valor_freelancer || 0),
+      0
+    );
+
+    const totalSacado = (saques || [])
+      .filter((s: any) => s.status === "solicitado" || s.status === "pago")
+      .reduce((acc: number, item: any) => acc + Number(item.valor || 0), 0);
+
+    setSaldoDisponivel(totalLiberado - totalSacado);
+  }
 
   function sair() {
     localStorage.removeItem("freelabrasil_usuario");
@@ -33,6 +65,7 @@ export default function Navbar() {
 
   function iniciais(nome?: string) {
     if (!nome) return "U";
+
     return nome
       .split(" ")
       .map((n) => n[0])
@@ -41,19 +74,22 @@ export default function Navbar() {
       .toUpperCase();
   }
 
+  function formatar(valor: number) {
+    return valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-slate-950/95 backdrop-blur text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-        {/* LOGO */}
         <div className="flex items-center gap-8">
           <Link href="/" className="text-2xl font-black tracking-tight">
             Freela<span className="text-emerald-400">Brasil</span>
           </Link>
 
-          {/* MENU PRINCIPAL */}
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-
             <Link href="/projetos" className="hover:text-emerald-400">
               Buscar projetos
             </Link>
@@ -62,7 +98,6 @@ export default function Navbar() {
               Freelancers
             </Link>
 
-            {/* FREELA */}
             {usuario?.tipo_usuario === "freelancer" && (
               <>
                 <Link href="/meus-trabalhos" className="hover:text-emerald-400">
@@ -70,12 +105,11 @@ export default function Navbar() {
                 </Link>
 
                 <Link href="/saques" className="hover:text-emerald-400">
-                  💰 Saques
+                  Saques
                 </Link>
               </>
             )}
 
-            {/* CONTRATANTE */}
             {usuario?.tipo_usuario === "contratante" && (
               <>
                 <Link href="/meus-projetos" className="hover:text-emerald-400">
@@ -88,12 +122,8 @@ export default function Navbar() {
               </>
             )}
 
-            {/* FINANCEIRO (TODOS LOGADOS) */}
             {usuario && (
-              <Link
-                href="/dashboard-financeiro"
-                className="hover:text-yellow-400"
-              >
+              <Link href="/dashboard-financeiro" className="hover:text-yellow-400">
                 Financeiro
               </Link>
             )}
@@ -101,11 +131,9 @@ export default function Navbar() {
             <Link href="/planos" className="hover:text-purple-400">
               Planos
             </Link>
-
           </nav>
         </div>
 
-        {/* DIREITA */}
         {!usuario ? (
           <div className="flex items-center gap-3">
             <Link
@@ -124,8 +152,15 @@ export default function Navbar() {
           </div>
         ) : (
           <div className="relative flex items-center gap-4">
+            {usuario.tipo_usuario === "freelancer" && (
+              <Link
+                href="/saques"
+                className="hidden rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300 hover:bg-emerald-400/20 md:block"
+              >
+                Saldo {formatar(saldoDisponivel)}
+              </Link>
+            )}
 
-            {/* NOTIFICAÇÃO */}
             <Link
               href="/notificacoes"
               className="hidden rounded-xl border border-white/10 px-4 py-2 text-sm font-bold hover:bg-white/5 md:block"
@@ -133,7 +168,6 @@ export default function Navbar() {
               🔔
             </Link>
 
-            {/* PERFIL */}
             <button
               onClick={() => setMenuAberto(!menuAberto)}
               className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
@@ -151,9 +185,7 @@ export default function Navbar() {
               </div>
 
               <div className="hidden text-left md:block">
-                <p className="text-sm font-bold leading-4">
-                  {usuario.nome}
-                </p>
+                <p className="text-sm font-bold leading-4">{usuario.nome}</p>
                 <p className="text-xs text-slate-400">
                   {badgePlano(usuario.plano)}
                 </p>
@@ -162,21 +194,26 @@ export default function Navbar() {
               <span className="text-slate-400">▾</span>
             </button>
 
-            {/* DROPDOWN */}
             {menuAberto && (
-              <div className="absolute right-0 top-14 w-72 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
-
+              <div className="absolute right-0 top-14 w-80 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
                 <div className="border-b border-white/10 p-4">
                   <p className="font-black">{usuario.nome}</p>
                   <p className="text-sm text-slate-400">{usuario.email}</p>
 
-                  <p className="mt-2 inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                    {badgePlano(usuario.plano)}
-                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <p className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
+                      {badgePlano(usuario.plano)}
+                    </p>
+
+                    {usuario.tipo_usuario === "freelancer" && (
+                      <p className="inline-block rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                        Saldo {formatar(saldoDisponivel)}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-col p-2 text-sm">
-
                   <Link
                     href={painelUsuario()}
                     onClick={() => setMenuAberto(false)}
@@ -198,9 +235,9 @@ export default function Navbar() {
                       <Link
                         href="/saques"
                         onClick={() => setMenuAberto(false)}
-                        className="rounded-xl px-4 py-3 hover:bg-white/5"
+                        className="rounded-xl px-4 py-3 hover:bg-emerald-400/10 text-emerald-300"
                       >
-                        💰 Saques
+                        Saques / Saldo
                       </Link>
                     </>
                   )}
@@ -253,7 +290,6 @@ export default function Navbar() {
                   >
                     Sair
                   </button>
-
                 </div>
               </div>
             )}
