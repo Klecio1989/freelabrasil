@@ -1,24 +1,21 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
+import Navbar from "@/components/Navbar";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "FreelaBrasil",
-  description: "Marketplace de freelancers e projetos",
+  description: "Plataforma de freelancers",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="pt-BR">
-      <body className="bg-slate-950 text-white min-h-screen flex flex-col">
-        <Header />
-        <div className="flex-1">{children}</div>
-        <Footer />
+      <body className="bg-slate-950">
+        <Navbar />
+        {children}
       </body>
     </html>
   );

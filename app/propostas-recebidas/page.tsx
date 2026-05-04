@@ -26,19 +26,44 @@ export default function PropostasRecebidasPage() {
     carregarPropostas();
   }, []);
 
+  function valorParaNumero(valor: string) {
+    if (!valor) return 0;
+
+    const limpo = String(valor)
+      .replace("R$", "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim();
+
+    const numero = Number(limpo);
+
+    return isNaN(numero) ? 0 : numero;
+  }
+
   async function carregarPropostas() {
     setCarregando(true);
 
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (!usuarioSalvo) return;
+
+    if (!usuarioSalvo) {
+      setCarregando(false);
+      return;
+    }
 
     const parsed = JSON.parse(usuarioSalvo);
     setUsuario(parsed);
 
-    const { data: projetos } = await supabase
+    const { data: projetos, error: projetosError } = await supabase
       .from("projetos")
       .select("id,titulo")
       .eq("contratante_id", parsed.id);
+
+    if (projetosError) {
+      console.error(projetosError);
+      alert("Erro ao carregar projetos.");
+      setCarregando(false);
+      return;
+    }
 
     if (!projetos || projetos.length === 0) {
       setPropostas([]);
@@ -48,11 +73,18 @@ export default function PropostasRecebidasPage() {
 
     const projetoIds = projetos.map((p: any) => p.id);
 
-    const { data: propostasData } = await supabase
+    const { data: propostasData, error: propostasError } = await supabase
       .from("propostas")
       .select("*")
       .in("projeto_id", projetoIds)
       .order("created_at", { ascending: false });
+
+    if (propostasError) {
+      console.error(propostasError);
+      alert("Erro ao carregar propostas.");
+      setCarregando(false);
+      return;
+    }
 
     if (!propostasData) {
       setPropostas([]);
@@ -87,7 +119,125 @@ export default function PropostasRecebidasPage() {
     setCarregando(false);
   }
 
-  async function atualizarStatus(proposta: Proposta, status: "aceita" | "recusada") {
+  async function criarProjetoEmAndamento(proposta: Proposta) {
+    if (!usuario) return null;
+
+    const { data: existente, error: buscarError } = await supabase
+      .from("projetos_andamento")
+      .select("id")
+      .eq("projeto_id", proposta.projeto_id)
+      .maybeSingle();
+
+    if (buscarError) {
+      console.error("Erro ao verificar projeto em andamento:", buscarError);
+      alert("Erro ao verificar projeto em andamento.");
+      return null;
+    }
+
+    if (existente) {
+      return existente.id;
+    }
+
+    const { data, error: insertError } = await supabase
+      .from("projetos_andamento")
+      .insert([
+        {
+          projeto_id: proposta.projeto_id,
+          freela_id: proposta.freelancer_id,
+          contratante_id: usuario.id,
+          status: "em_andamento",
+          data_inicio: new Date().toISOString(),
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (insertError) {
+      console.error("Erro ao criar projeto em andamento:", insertError);
+      alert("Erro ao criar projeto em andamento: " + insertError.message);
+      return null;
+    }
+
+    return data.id;
+  }
+
+  async function criarChat(proposta: Proposta) {
+    if (!usuario) return;
+
+    const { data: chatExistente } = await supabase
+      .from("chats")
+      .select("id")
+      .eq("projeto_id", proposta.projeto_id)
+      .eq("freela_id", proposta.freelancer_id)
+      .eq("contratante_id", usuario.id)
+      .maybeSingle();
+
+    if (chatExistente) return;
+
+    await supabase.from("chats").insert([
+      {
+        projeto_id: proposta.projeto_id,
+        freela_id: proposta.freelancer_id,
+        contratante_id: usuario.id,
+      },
+    ]);
+  }
+
+  async function criarPagamentoRetido(proposta: Proposta, projetoAndamentoId: string) {
+    if (!usuario) return;
+
+    const valorBruto = valorParaNumero(proposta.valor);
+    const taxaPercentual = 5;
+    const comissaoPlataforma = Number((valorBruto * 0.05).toFixed(2));
+    const valorFreelancer = Number((valorBruto - comissaoPlataforma).toFixed(2));
+
+    const { data: pagamentoExistente } = await supabase
+      .from("pagamentos")
+      .select("id")
+      .eq("projeto_id", proposta.projeto_id)
+      .maybeSingle();
+
+    if (pagamentoExistente) return;
+
+    await supabase.from("pagamentos").insert([
+      {
+        projeto_id: proposta.projeto_id,
+        projeto_andamento_id: projetoAndamentoId,
+        contratante_id: usuario.id,
+        freela_id: proposta.freelancer_id,
+        valor_bruto: valorBruto,
+        taxa_percentual: taxaPercentual,
+        comissao_plataforma: comissaoPlataforma,
+        valor_freelancer: valorFreelancer,
+        status: "retido",
+      },
+    ]);
+  }
+
+  async function atualizarStatus(
+    proposta: Proposta,
+    status: "aceita" | "recusada"
+  ) {
+    if (!usuario) {
+      alert("Usuário não localizado.");
+      return;
+    }
+
+    if (status === "aceita") {
+      const confirmar = confirm(
+        "Deseja aceitar esta proposta e iniciar o projeto com este freelancer?"
+      );
+
+      if (!confirmar) return;
+
+      const projetoAndamentoId = await criarProjetoEmAndamento(proposta);
+
+      if (!projetoAndamentoId) return;
+
+      await criarChat(proposta);
+      await criarPagamentoRetido(proposta, projetoAndamentoId);
+    }
+
     const { error } = await supabase
       .from("propostas")
       .update({ status })
@@ -98,35 +248,71 @@ export default function PropostasRecebidasPage() {
       return;
     }
 
+    if (status === "aceita") {
+      await supabase
+        .from("propostas")
+        .update({ status: "recusada" })
+        .eq("projeto_id", proposta.projeto_id)
+        .neq("id", proposta.id)
+        .eq("status", "pendente");
+    }
+
     await supabase.from("notificacoes").insert([
       {
         usuario_id: proposta.freelancer_id,
         titulo: status === "aceita" ? "Proposta aceita" : "Proposta recusada",
-        descricao: `Sua proposta para "${proposta.projeto_titulo}" foi ${status}.`,
+        descricao:
+          status === "aceita"
+            ? `Sua proposta para "${proposta.projeto_titulo}" foi aceita. O projeto já está em Meus Trabalhos.`
+            : `Sua proposta para "${proposta.projeto_titulo}" foi recusada.`,
         lida: false,
-        link: `/chat?proposta_id=${proposta.id}`,
+        link: status === "aceita" ? "/meus-trabalhos" : "/minhas-propostas",
       },
     ]);
 
     setPropostas((prev) =>
-      prev.map((p) =>
-        p.id === proposta.id ? { ...p, status } : p
-      )
+      prev.map((p) => {
+        if (p.id === proposta.id) {
+          return { ...p, status };
+        }
+
+        if (status === "aceita" && p.projeto_id === proposta.projeto_id) {
+          return p.status === "pendente" || !p.status
+            ? { ...p, status: "recusada" }
+            : p;
+        }
+
+        return p;
+      })
     );
 
-    alert(status === "aceita" ? "Proposta aceita!" : "Proposta recusada.");
+    alert(
+      status === "aceita"
+        ? "Proposta aceita! Projeto iniciado, chat criado e pagamento retido com comissão promocional de 5%."
+        : "Proposta recusada."
+    );
   }
 
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-5xl font-black mb-10">
-          Propostas recebidas
-        </h1>
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-5xl font-black">Propostas recebidas</h1>
+            <p className="mt-3 text-slate-400">
+              Aceite uma proposta para iniciar automaticamente o projeto.
+            </p>
+          </div>
 
-        {carregando && (
-          <p className="text-slate-400">Carregando...</p>
-        )}
+          <Link
+            href="/painel-contratante"
+            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+          >
+            Voltar
+          </Link>
+        </div>
+
+        {carregando && <p className="text-slate-400">Carregando...</p>}
 
         {!carregando && propostas.length === 0 && (
           <p className="text-slate-400">Nenhuma proposta recebida.</p>
@@ -138,18 +324,33 @@ export default function PropostasRecebidasPage() {
               key={p.id}
               className="bg-white/5 border border-white/10 p-6 rounded-2xl"
             >
-              <h2 className="text-2xl font-bold">
-                {p.projeto_titulo}
-              </h2>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">{p.projeto_titulo}</h2>
 
-              <p className="text-sm text-slate-400 mt-1">
-                Freelancer: {p.freelancer_nome}
-              </p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Freelancer: {p.freelancer_nome}
+                  </p>
+                </div>
 
-              <p className="mt-4">{p.mensagem}</p>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    p.status === "aceita"
+                      ? "bg-emerald-400/10 text-emerald-300 border border-emerald-400/20"
+                      : p.status === "recusada"
+                      ? "bg-red-400/10 text-red-300 border border-red-400/20"
+                      : "bg-yellow-400/10 text-yellow-300 border border-yellow-400/20"
+                  }`}
+                >
+                  {p.status || "pendente"}
+                </span>
+              </div>
 
-              <div className="mt-4 text-sm">
+              <p className="mt-4 text-slate-200">{p.mensagem}</p>
+
+              <div className="mt-4 text-sm text-slate-300">
                 💰 Valor: {p.valor} <br />
+                🧾 Comissão promocional: 5% <br />
                 ⏱ Prazo: {p.prazo} dias
               </div>
 
@@ -160,7 +361,7 @@ export default function PropostasRecebidasPage() {
                       onClick={() => atualizarStatus(p, "aceita")}
                       className="bg-emerald-400 text-black px-4 py-2 rounded font-bold"
                     >
-                      Aceitar
+                      Aceitar e iniciar projeto
                     </button>
 
                     <button
@@ -173,12 +374,21 @@ export default function PropostasRecebidasPage() {
                 )}
 
                 {p.status === "aceita" && (
-                  <Link
-                    href={`/chat?proposta_id=${p.id}`}
-                    className="bg-emerald-400 text-black px-4 py-2 rounded font-bold"
-                  >
-                    Abrir chat
-                  </Link>
+                  <>
+                    <Link
+                      href="/meus-projetos"
+                      className="bg-emerald-400 text-black px-4 py-2 rounded font-bold"
+                    >
+                      Ver em Meus Projetos
+                    </Link>
+
+                    <Link
+                      href={`/chat?proposta_id=${p.id}`}
+                      className="border border-white/20 px-4 py-2 rounded font-bold"
+                    >
+                      Abrir chat
+                    </Link>
+                  </>
                 )}
 
                 {p.status === "recusada" && (
