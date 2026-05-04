@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-export default function NotificacoesPage() {
+export default function MinhasAvaliacoesPage() {
   const [usuario, setUsuario] = useState<any>(null);
-  const [notificacoes, setNotificacoes] = useState<any[]>([]);
+  const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregar();
+    carregarAvaliacoes();
   }, []);
 
-  async function carregar() {
+  async function carregarAvaliacoes() {
     const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
     if (!usuarioSalvo) {
@@ -25,49 +25,24 @@ export default function NotificacoesPage() {
     setUsuario(parsed);
 
     const { data, error } = await supabase
-      .from("notificacoes")
+      .from("avaliacoes")
       .select("*")
-      .eq("usuario_id", parsed.id)
+      .eq("avaliado_id", parsed.id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
-      setNotificacoes([]);
+      console.error("Erro ao carregar avaliações:", error);
+      setAvaliacoes([]);
     } else {
-      setNotificacoes(data || []);
+      setAvaliacoes(data || []);
     }
 
     setLoading(false);
   }
 
-  async function marcarComoLida(id: string) {
-    await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
-
-    setNotificacoes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
-    );
-  }
-
-  async function marcarTodasComoLidas() {
-    if (!usuario) return;
-
-    await supabase
-      .from("notificacoes")
-      .update({ lida: true })
-      .eq("usuario_id", usuario.id);
-
-    setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
-  }
-
-  function linkNotificacao(n: any) {
-    if (
-      String(n.titulo || "").toLowerCase().includes("avaliação") ||
-      String(n.descricao || "").toLowerCase().includes("avaliou")
-    ) {
-      return "/minhas-avaliacoes";
-    }
-
-    return n.link || "/notificacoes";
+  function estrelas(nota: number) {
+    const valor = Number(nota || 0);
+    return "★".repeat(valor) + "☆".repeat(5 - valor);
   }
 
   function voltarPainel() {
@@ -75,8 +50,6 @@ export default function NotificacoesPage() {
     if (usuario?.tipo_usuario === "contratante") return "/painel-contratante";
     return "/";
   }
-
-  const naoLidas = notificacoes.filter((n) => !n.lida).length;
 
   if (loading) {
     return (
@@ -96,82 +69,50 @@ export default function NotificacoesPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <section className="mx-auto max-w-6xl">
+      <section className="mx-auto max-w-5xl">
         <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black">Notificações</h1>
+            <h1 className="text-4xl font-black">Minhas Avaliações</h1>
             <p className="mt-3 text-slate-400">
-              Acompanhe atualizações da plataforma em tempo real
+              Veja as notas e comentários recebidos nos projetos concluídos.
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={marcarTodasComoLidas}
-              className="rounded-xl bg-white px-5 py-3 font-bold text-black"
-            >
-              Marcar todas como lidas
-            </button>
-
-            <Link
-              href={voltarPainel()}
-              className="rounded-xl border border-white/20 px-5 py-3 font-bold"
-            >
-              Voltar
-            </Link>
-          </div>
+          <Link
+            href={voltarPainel()}
+            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+          >
+            Voltar
+          </Link>
         </div>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-3">
-          <Card titulo="Total" valor={String(notificacoes.length)} />
-          <Card titulo="Não lidas" valor={String(naoLidas)} />
-          <Card titulo="Tempo real" valor="Ativo" destaque />
-        </div>
-
-        {notificacoes.length === 0 && (
+        {avaliacoes.length === 0 && (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            Nenhuma notificação encontrada.
+            Nenhuma avaliação recebida ainda.
           </div>
         )}
 
         <div className="grid gap-5">
-          {notificacoes.map((n) => (
+          {avaliacoes.map((a) => (
             <div
-              key={n.id}
-              className={`rounded-3xl border p-6 ${
-                n.lida
-                  ? "border-white/10 bg-slate-900"
-                  : "border-emerald-400/30 bg-emerald-400/10"
-              }`}
+              key={a.id}
+              className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
             >
-              <h2 className="text-2xl font-black">
-                {n.titulo || "Notificação"}
-              </h2>
+              <div className="text-3xl text-yellow-400">
+                {estrelas(a.nota)}
+              </div>
 
-              <p className="mt-4 text-slate-200">{n.descricao}</p>
+              <p className="mt-4 text-lg leading-8 text-slate-200">
+                “{a.comentario || "Sem comentário."}”
+              </p>
 
-              {n.created_at && (
-                <p className="mt-4 text-sm text-slate-500">
-                  {new Date(n.created_at).toLocaleString("pt-BR")}
-                </p>
-              )}
+              <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-400">
+                <span>Nota: {a.nota}/5</span>
 
-              <div className="mt-6 flex gap-3">
-                <Link
-                  href={linkNotificacao(n)}
-                  onClick={() => marcarComoLida(n.id)}
-                  className="rounded-xl border border-white/20 px-5 py-3 font-bold"
-                >
-                  Abrir
-                </Link>
-
-                {!n.lida && (
-                  <button
-                    onClick={() => marcarComoLida(n.id)}
-                    className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-black"
-                  >
-                    Marcar como lida
-                  </button>
+                {a.created_at && (
+                  <span>
+                    Data: {new Date(a.created_at).toLocaleDateString("pt-BR")}
+                  </span>
                 )}
               </div>
             </div>
@@ -179,28 +120,5 @@ export default function NotificacoesPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function Card({
-  titulo,
-  valor,
-  destaque,
-}: {
-  titulo: string;
-  valor: string;
-  destaque?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-2xl border p-5 ${
-        destaque
-          ? "border-emerald-400/30 bg-emerald-400/10"
-          : "border-white/10 bg-white/5"
-      }`}
-    >
-      <p className="text-sm text-slate-400">{titulo}</p>
-      <p className="mt-2 text-2xl font-black">{valor}</p>
-    </div>
   );
 }
