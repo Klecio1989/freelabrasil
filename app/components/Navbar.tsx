@@ -44,12 +44,16 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-slate-950/95 backdrop-blur text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+
+        {/* LOGO */}
         <div className="flex items-center gap-8">
           <Link href="/" className="text-2xl font-black tracking-tight">
             Freela<span className="text-emerald-400">Brasil</span>
           </Link>
 
+          {/* MENU PRINCIPAL */}
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+
             <Link href="/projetos" className="hover:text-emerald-400">
               Buscar projetos
             </Link>
@@ -58,12 +62,20 @@ export default function Navbar() {
               Freelancers
             </Link>
 
+            {/* FREELA */}
             {usuario?.tipo_usuario === "freelancer" && (
-              <Link href="/meus-trabalhos" className="hover:text-emerald-400">
-                Meus Trabalhos
-              </Link>
+              <>
+                <Link href="/meus-trabalhos" className="hover:text-emerald-400">
+                  Meus Trabalhos
+                </Link>
+
+                <Link href="/saques" className="hover:text-emerald-400">
+                  💰 Saques
+                </Link>
+              </>
             )}
 
+            {/* CONTRATANTE */}
             {usuario?.tipo_usuario === "contratante" && (
               <>
                 <Link href="/meus-projetos" className="hover:text-emerald-400">
@@ -76,6 +88,7 @@ export default function Navbar() {
               </>
             )}
 
+            {/* FINANCEIRO (TODOS LOGADOS) */}
             {usuario && (
               <Link
                 href="/dashboard-financeiro"
@@ -88,9 +101,11 @@ export default function Navbar() {
             <Link href="/planos" className="hover:text-purple-400">
               Planos
             </Link>
+
           </nav>
         </div>
 
+        {/* DIREITA */}
         {!usuario ? (
           <div className="flex items-center gap-3">
             <Link
@@ -109,6 +124,8 @@ export default function Navbar() {
           </div>
         ) : (
           <div className="relative flex items-center gap-4">
+
+            {/* NOTIFICAÇÃO */}
             <Link
               href="/notificacoes"
               className="hidden rounded-xl border border-white/10 px-4 py-2 text-sm font-bold hover:bg-white/5 md:block"
@@ -116,6 +133,7 @@ export default function Navbar() {
               🔔
             </Link>
 
+            {/* PERFIL */}
             <button
               onClick={() => setMenuAberto(!menuAberto)}
               className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
@@ -133,7 +151,9 @@ export default function Navbar() {
               </div>
 
               <div className="hidden text-left md:block">
-                <p className="text-sm font-bold leading-4">{usuario.nome}</p>
+                <p className="text-sm font-bold leading-4">
+                  {usuario.nome}
+                </p>
                 <p className="text-xs text-slate-400">
                   {badgePlano(usuario.plano)}
                 </p>
@@ -142,17 +162,21 @@ export default function Navbar() {
               <span className="text-slate-400">▾</span>
             </button>
 
+            {/* DROPDOWN */}
             {menuAberto && (
               <div className="absolute right-0 top-14 w-72 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+
                 <div className="border-b border-white/10 p-4">
                   <p className="font-black">{usuario.nome}</p>
                   <p className="text-sm text-slate-400">{usuario.email}</p>
+
                   <p className="mt-2 inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
                     {badgePlano(usuario.plano)}
                   </p>
                 </div>
 
                 <div className="flex flex-col p-2 text-sm">
+
                   <Link
                     href={painelUsuario()}
                     onClick={() => setMenuAberto(false)}
@@ -162,13 +186,23 @@ export default function Navbar() {
                   </Link>
 
                   {usuario.tipo_usuario === "freelancer" && (
-                    <Link
-                      href="/meus-trabalhos"
-                      onClick={() => setMenuAberto(false)}
-                      className="rounded-xl px-4 py-3 hover:bg-white/5"
-                    >
-                      Meus Trabalhos
-                    </Link>
+                    <>
+                      <Link
+                        href="/meus-trabalhos"
+                        onClick={() => setMenuAberto(false)}
+                        className="rounded-xl px-4 py-3 hover:bg-white/5"
+                      >
+                        Meus Trabalhos
+                      </Link>
+
+                      <Link
+                        href="/saques"
+                        onClick={() => setMenuAberto(false)}
+                        className="rounded-xl px-4 py-3 hover:bg-white/5"
+                      >
+                        💰 Saques
+                      </Link>
+                    </>
                   )}
 
                   {usuario.tipo_usuario === "contratante" && (
@@ -186,7 +220,7 @@ export default function Navbar() {
                     onClick={() => setMenuAberto(false)}
                     className="rounded-xl px-4 py-3 hover:bg-white/5"
                   >
-                    Dashboard Financeiro
+                    Financeiro
                   </Link>
 
                   <Link
@@ -219,6 +253,7 @@ export default function Navbar() {
                   >
                     Sair
                   </button>
+
                 </div>
               </div>
             )}
