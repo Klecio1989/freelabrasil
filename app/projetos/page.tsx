@@ -49,11 +49,14 @@ export default function ProjetosPage() {
       .order("created_at", { ascending: false });
 
     if (error || !data) {
+      console.error(error);
       setCarregando(false);
       return;
     }
 
-    const ids = [...new Set(data.map((p: any) => p.contratante_id).filter(Boolean))];
+    const ids = [
+      ...new Set(data.map((p: any) => p.contratante_id).filter(Boolean)),
+    ];
 
     let usuariosMap: Record<string, any> = {};
 
@@ -108,14 +111,27 @@ export default function ProjetosPage() {
 
   const projetosFiltrados = useMemo(() => {
     return projetos.filter((projeto) => {
-      const texto = `${projeto.titulo} ${projeto.descricao} ${projeto.area} ${projeto.contratante_nome}`.toLowerCase();
+      const texto = `
+        ${projeto.titulo || ""}
+        ${projeto.descricao || ""}
+        ${projeto.area || ""}
+        ${projeto.contratante_nome || ""}
+      `.toLowerCase();
 
-      const bateBusca = busca
-        ? texto.includes(busca.toLowerCase())
+      const palavras = busca
+        .toLowerCase()
+        .split(" ")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const bateBusca = palavras.length
+        ? palavras.every((palavra) => texto.includes(palavra))
         : true;
 
       const bateArea =
-        filtroArea === "todas" ? true : projeto.area === filtroArea;
+        filtroArea === "todas"
+          ? true
+          : projeto.area?.toLowerCase().includes(filtroArea.toLowerCase());
 
       return bateBusca && bateArea;
     });
@@ -126,25 +142,30 @@ export default function ProjetosPage() {
     window.location.href = "/login";
   }
 
+  function limparFiltros() {
+    setBusca("");
+    setFiltroArea("todas");
+  }
+
   function badgePlano(plano?: string) {
     if (plano === "pro") {
       return (
-        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
-          PRO
+        <span className="rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-black text-yellow-300">
+          👑 PRO
         </span>
       );
     }
 
     if (plano === "plus") {
       return (
-        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-          PLUS
+        <span className="rounded-full border border-cyan-400/40 bg-cyan-400/15 px-3 py-1 text-xs font-black text-cyan-300">
+          💎 PLUS
         </span>
       );
     }
 
     return (
-      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
+      <span className="rounded-full border border-white/10 bg-slate-700 px-3 py-1 text-xs font-bold text-white">
         GRATUITO
       </span>
     );
@@ -152,11 +173,11 @@ export default function ProjetosPage() {
 
   function cardDestaque(plano?: string) {
     if (plano === "pro") {
-      return "border-purple-500/40 bg-purple-500/5";
+      return "border-yellow-400/50 bg-yellow-400/10 shadow-yellow-500/20";
     }
 
     if (plano === "plus") {
-      return "border-emerald-400/40 bg-emerald-400/5";
+      return "border-cyan-400/40 bg-cyan-400/10 shadow-cyan-500/10";
     }
 
     return "border-white/10 bg-white/5";
@@ -176,14 +197,17 @@ export default function ProjetosPage() {
             </h1>
 
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              Explore oportunidades, filtre por área e envie propostas para projetos reais.
+              Busque por palavras-chave como Power BI, Excel, Automação, Python,
+              Dashboard ou qualquer área que combine com sua experiência.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Projetos</div>
-              <div className="mt-1 text-2xl font-black">{projetosFiltrados.length}</div>
+              <div className="text-sm text-slate-400">Projetos encontrados</div>
+              <div className="mt-1 text-2xl font-black">
+                {projetosFiltrados.length}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
@@ -191,57 +215,73 @@ export default function ProjetosPage() {
               <div className="mt-1 text-2xl font-black">{areas.length - 1}</div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-              <div className="text-sm text-slate-400">Prioridade</div>
-              <div className="mt-1 text-2xl font-black">Pro / Plus</div>
+            <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-5 py-4">
+              <div className="text-sm text-yellow-200">Prioridade</div>
+              <div className="mt-1 text-2xl font-black">PRO / PLUS</div>
             </div>
           </div>
         </div>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-[1fr_240px_auto]">
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por título, descrição, área ou contratante"
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
-          />
+        <div className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_240px_auto]">
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Ex: Power BI, Excel, Automação, Python, Dashboard"
+              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            />
 
-          <select
-            value={filtroArea}
-            onChange={(e) => setFiltroArea(e.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-          >
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area === "todas" ? "Todas as áreas" : area}
-              </option>
-            ))}
-          </select>
+            <select
+              value={filtroArea}
+              onChange={(e) => setFiltroArea(e.target.value)}
+              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+            >
+              {areas.map((area) => (
+                <option key={area} value={area}>
+                  {area === "todas" ? "Todas as áreas" : area}
+                </option>
+              ))}
+            </select>
 
-          <div className="flex gap-3">
-            {usuario?.tipo_usuario === "contratante" && (
-              <Link
-                href="/projetos/novo"
-                className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02]"
-              >
-                Novo projeto
-              </Link>
-            )}
-
-            {usuario ? (
+            <div className="flex gap-3">
               <button
-                onClick={sair}
-                className="rounded-xl border border-red-400/30 px-5 py-3 font-medium text-red-300 transition hover:bg-red-400/10"
-              >
-                Sair
-              </button>
-            ) : (
-              <Link
-                href="/login"
+                onClick={limparFiltros}
                 className="rounded-xl border border-white/15 px-5 py-3 font-medium text-white transition hover:bg-white/5"
               >
-                Login
-              </Link>
+                Limpar
+              </button>
+
+              {usuario?.tipo_usuario === "contratante" && (
+                <Link
+                  href="/projetos/novo"
+                  className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02]"
+                >
+                  Novo projeto
+                </Link>
+              )}
+
+              {!usuario && (
+                <Link
+                  href="/login"
+                  className="rounded-xl border border-white/15 px-5 py-3 font-medium text-white transition hover:bg-white/5"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {["Power BI", "Excel", "Automação", "Python", "Dashboard", "SQL"].map(
+              (tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setBusca(tag)}
+                  className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300 hover:border-emerald-400/40 hover:text-emerald-300"
+                >
+                  {tag}
+                </button>
+              )
             )}
           </div>
         </div>
@@ -256,7 +296,7 @@ export default function ProjetosPage() {
           <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center">
             <h2 className="text-2xl font-black">Nenhum projeto encontrado</h2>
             <p className="mt-3 text-slate-400">
-              Ajuste a busca ou o filtro para encontrar mais resultados.
+              Ajuste a busca, tente outra palavra-chave ou limpe os filtros.
             </p>
           </div>
         )}
