@@ -10,17 +10,32 @@ export default function Navbar() {
   const [saldoDisponivel, setSaldoDisponivel] = useState(0);
 
   useEffect(() => {
+    carregarUsuario();
+
+    window.addEventListener("storage", carregarUsuario);
+    window.addEventListener("focus", carregarUsuario);
+
+    return () => {
+      window.removeEventListener("storage", carregarUsuario);
+      window.removeEventListener("focus", carregarUsuario);
+    };
+  }, []);
+
+  function carregarUsuario() {
     const user = localStorage.getItem("freelabrasil_usuario");
 
-    if (user) {
-      const parsed = JSON.parse(user);
-      setUsuario(parsed);
-
-      if (parsed.tipo_usuario === "freelancer") {
-        carregarSaldo(parsed.id);
-      }
+    if (!user) {
+      setUsuario(null);
+      return;
     }
-  }, []);
+
+    const parsed = JSON.parse(user);
+    setUsuario(parsed);
+
+    if (parsed.tipo_usuario === "freelancer") {
+      carregarSaldo(parsed.id);
+    }
+  }
 
   async function carregarSaldo(freelaId: string) {
     const { data: pagamentos } = await supabase
@@ -48,6 +63,7 @@ export default function Navbar() {
 
   function sair() {
     localStorage.removeItem("freelabrasil_usuario");
+    setUsuario(null);
     window.location.href = "/";
   }
 
@@ -123,7 +139,10 @@ export default function Navbar() {
             )}
 
             {usuario && (
-              <Link href="/dashboard-financeiro" className="hover:text-yellow-400">
+              <Link
+                href="/dashboard-financeiro"
+                className="hover:text-yellow-400"
+              >
                 Financeiro
               </Link>
             )}
@@ -235,7 +254,7 @@ export default function Navbar() {
                       <Link
                         href="/saques"
                         onClick={() => setMenuAberto(false)}
-                        className="rounded-xl px-4 py-3 hover:bg-emerald-400/10 text-emerald-300"
+                        className="rounded-xl px-4 py-3 text-emerald-300 hover:bg-emerald-400/10"
                       >
                         Saques / Saldo
                       </Link>
@@ -279,7 +298,7 @@ export default function Navbar() {
                   <Link
                     href="/planos"
                     onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-purple-500/10 text-purple-300"
+                    className="rounded-xl px-4 py-3 text-purple-300 hover:bg-purple-500/10"
                   >
                     Alterar Plano
                   </Link>
