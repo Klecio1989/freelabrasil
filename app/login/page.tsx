@@ -59,11 +59,6 @@ export default function LoginPage() {
         return;
       }
 
-      if (usuario.email_verificado === false) {
-        alert("Confirme seu email antes de acessar a plataforma.");
-        return;
-      }
-
       if (usuario.aceite_termos === false || usuario.aceite_comissao === false) {
         alert("Sua conta precisa aceitar os termos atualizados da plataforma.");
         return;
