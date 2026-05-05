@@ -1,118 +1,144 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-type Duracao = "mensal" | "trimestral" | "anual";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const mpAccessToken = process.env.MP_ACCESS_TOKEN!;
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    if (body.type !== "payment") {
-      return NextResponse.json({ ok: true });
-    }
+    const paymentId =
+      body?.data?.id ||
+      body?.id ||
+      body?.resource?.split?.("/")?.pop() ||
+      null;
 
-    const paymentId = body.data?.id;
+    const topic = body?.type || body?.topic || body?.action || "";
+
+    console.log("Webhook Mercado Pago recebido:", {
+      topic,
+      paymentId,
+      body,
+    });
 
     if (!paymentId) {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ received: true, ignored: "sem payment id" });
     }
 
-    const accessToken = process.env.MP_ACCESS_TOKEN;
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "MP_ACCESS_TOKEN ausente" },
-        { status: 500 }
-      );
-    }
-
-    const res = await fetch(
+    const paymentResponse = await fetch(
       `https://api.mercadopago.com/v1/payments/${paymentId}`,
       {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${mpAccessToken}`,
         },
       }
     );
 
-    const payment = await res.json();
+    const payment = await paymentResponse.json();
 
-    if (payment.status !== "approved") {
-      return NextResponse.json({ ok: true });
-    }
-
-    let usuarioId = payment.metadata?.usuario_id;
-    let plano = payment.metadata?.plano;
-    let duracao: Duracao = payment.metadata?.duracao;
-
-    if ((!usuarioId || !plano || !duracao) && payment.external_reference) {
-      const partes = String(payment.external_reference).split("|");
-      usuarioId = partes[0];
-      plano = partes[1];
-      duracao = partes[2] as Duracao;
-    }
-
-    if (!usuarioId || !plano || !duracao) {
+    if (!paymentResponse.ok) {
+      console.error("Erro ao consultar pagamento MP:", payment);
       return NextResponse.json(
-        { error: "Metadata incompleta no pagamento" },
-        { status: 400 }
+        { received: true, error: "erro ao consultar pagamento" },
+        { status: 200 }
       );
     }
 
-    const mesesPorDuracao: Record<Duracao, number> = {
-      mensal: 1,
-      trimestral: 3,
-      anual: 12,
+    const mpStatus = payment.status;
+    const externalReference = payment.external_reference;
+
+    let referencia: any = {};
+
+    try {
+      referencia = externalReference ? JSON.parse(externalReference) : {};
+    } catch {
+      referencia = {};
+    }
+
+    const pagamentoId = referencia.pagamento_id;
+    const projetoId = referencia.projeto_id;
+
+    if (!pagamentoId && !projetoId) {
+      console.log("Pagamento sem referência interna:", externalReference);
+      return NextResponse.json({
+        received: true,
+        ignored: "sem referencia interna",
+      });
+    }
+
+    const updatePayload: any = {
+      mp_payment_id: String(payment.id),
+      mp_status: mpStatus,
+      mp_external_reference: externalReference,
     };
 
-    const validade = new Date();
-    validade.setMonth(validade.getMonth() + mesesPorDuracao[duracao]);
+    if (mpStatus === "approved") {
+      updatePayload.status = "retido";
+      updatePayload.pago_em = new Date().toISOString();
+    }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    let query = supabaseAdmin.from("pagamentos").update(updatePayload);
 
-    await supabase
-      .from("usuarios")
-      .update({
-        plano,
-        plano_validade: validade.toISOString(),
-      })
-      .eq("id", usuarioId);
+    if (pagamentoId) {
+      query = query.eq("id", pagamentoId);
+    } else {
+      query = query.eq("projeto_id", projetoId);
+    }
 
-    await supabase.from("pagamentos").insert([
-      {
-        usuario_id: usuarioId,
-        plano,
-        duracao,
-        valor: payment.transaction_amount,
-        status: "pago",
-        pagamento_id: String(paymentId),
-      },
-    ]);
+    const { error } = await query;
 
-    await supabase.from("notificacoes").insert([
-      {
-        usuario_id: usuarioId,
-        titulo: "Plano ativado",
-        descricao: `Seu plano ${String(plano).toUpperCase()} foi ativado por ${
-          duracao === "mensal"
-            ? "1 mês"
-            : duracao === "trimestral"
-            ? "3 meses"
-            : "1 ano"
-        }.`,
-        lida: false,
-        link: "/planos",
-      },
-    ]);
+    if (error) {
+      console.error("Erro ao atualizar pagamento no Supabase:", error);
+      return NextResponse.json(
+        { received: true, error: "erro supabase" },
+        { status: 200 }
+      );
+    }
 
-    return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Erro webhook" },
-      { status: 500 }
-    );
+    if (mpStatus === "approved") {
+      const { data: pagamento } = await supabaseAdmin
+        .from("pagamentos")
+        .select("freela_id, contratante_id, projeto_id")
+        .eq(pagamentoId ? "id" : "projeto_id", pagamentoId || projetoId)
+        .maybeSingle();
+
+      if (pagamento) {
+        await supabaseAdmin.from("notificacoes").insert([
+          {
+            usuario_id: pagamento.contratante_id,
+            titulo: "Pagamento aprovado",
+            descricao:
+              "O pagamento do projeto foi aprovado e ficará retido até a conclusão e avaliação.",
+            lida: false,
+            link: "/meus-projetos",
+          },
+          {
+            usuario_id: pagamento.freela_id,
+            titulo: "Pagamento retido",
+            descricao:
+              "O contratante realizou o pagamento. O valor ficará retido até a confirmação da entrega.",
+            lida: false,
+            link: "/meus-trabalhos",
+          },
+        ]);
+      }
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("Erro webhook Mercado Pago:", error);
+    return NextResponse.json({ received: true }, { status: 200 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "Webhook Mercado Pago ativo.",
+  });
 }
