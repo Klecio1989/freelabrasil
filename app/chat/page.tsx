@@ -1,11 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 p-10 text-white">
+          Carregando chat...
+        </main>
+      }
+    >
+      <ChatContent />
+    </Suspense>
+  );
+}
+
+function ChatContent() {
   const searchParams = useSearchParams();
   const propostaId = searchParams.get("proposta_id");
 
