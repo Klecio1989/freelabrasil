@@ -174,44 +174,75 @@ export default function PropostasRecebidasPage() {
 
     if (chatExistente) return;
 
-    await supabase.from("chats").insert([
+    const { error } = await supabase.from("chats").insert([
       {
         projeto_id: proposta.projeto_id,
         freela_id: proposta.freelancer_id,
         contratante_id: usuario.id,
       },
     ]);
+
+    if (error) {
+      console.error("Erro ao criar chat:", error);
+    }
   }
 
-  async function criarPagamentoRetido(proposta: Proposta, projetoAndamentoId: string) {
-    if (!usuario) return;
+  async function criarPagamentoRetido(
+    proposta: Proposta,
+    projetoAndamentoId: string
+  ) {
+    if (!usuario) return false;
 
     const valorBruto = valorParaNumero(proposta.valor);
-    const taxaPercentual = 5;
-    const comissaoPlataforma = Number((valorBruto * 0.05).toFixed(2));
-    const valorFreelancer = Number((valorBruto - comissaoPlataforma).toFixed(2));
 
-    const { data: pagamentoExistente } = await supabase
-      .from("pagamentos")
-      .select("id")
-      .eq("projeto_id", proposta.projeto_id)
-      .maybeSingle();
+    if (valorBruto <= 0) {
+      alert("O valor da proposta precisa ser maior que zero.");
+      return false;
+    }
 
-    if (pagamentoExistente) return;
+    const { data: pagamentoExistente, error: buscarPagamentoError } =
+      await supabase
+        .from("pagamentos")
+        .select("id")
+        .eq("projeto_id", proposta.projeto_id)
+        .maybeSingle();
 
-    await supabase.from("pagamentos").insert([
+    if (buscarPagamentoError) {
+      console.error("Erro ao verificar pagamento:", buscarPagamentoError);
+      alert("Erro ao verificar pagamento.");
+      return false;
+    }
+
+    if (pagamentoExistente) {
+      return true;
+    }
+
+    /*
+      IMPORTANTE:
+      A comissão NÃO é calculada aqui no front.
+      O banco calcula automaticamente via trigger:
+      - taxa_percentual default 5
+      - comissao_plataforma = valor_bruto * 5%
+      - valor_freelancer = valor_bruto - comissão
+    */
+    const { error } = await supabase.from("pagamentos").insert([
       {
         projeto_id: proposta.projeto_id,
         projeto_andamento_id: projetoAndamentoId,
         contratante_id: usuario.id,
         freela_id: proposta.freelancer_id,
         valor_bruto: valorBruto,
-        taxa_percentual: taxaPercentual,
-        comissao_plataforma: comissaoPlataforma,
-        valor_freelancer: valorFreelancer,
         status: "retido",
       },
     ]);
+
+    if (error) {
+      console.error("Erro ao criar pagamento:", error);
+      alert("Erro ao criar pagamento: " + error.message);
+      return false;
+    }
+
+    return true;
   }
 
   async function atualizarStatus(
@@ -235,7 +266,13 @@ export default function PropostasRecebidasPage() {
       if (!projetoAndamentoId) return;
 
       await criarChat(proposta);
-      await criarPagamentoRetido(proposta, projetoAndamentoId);
+
+      const pagamentoCriado = await criarPagamentoRetido(
+        proposta,
+        projetoAndamentoId
+      );
+
+      if (!pagamentoCriado) return;
     }
 
     const { error } = await supabase
@@ -288,7 +325,7 @@ export default function PropostasRecebidasPage() {
 
     alert(
       status === "aceita"
-        ? "Proposta aceita! Projeto iniciado, chat criado e pagamento retido com comissão promocional de 5%."
+        ? "Proposta aceita! Projeto iniciado, chat criado e pagamento retido com comissão automática de 5%."
         : "Proposta recusada."
     );
   }
@@ -350,7 +387,7 @@ export default function PropostasRecebidasPage() {
 
               <div className="mt-4 text-sm text-slate-300">
                 💰 Valor: {p.valor} <br />
-                🧾 Comissão promocional: 5% <br />
+                🧾 Comissão promocional: 5% calculada automaticamente <br />
                 ⏱ Prazo: {p.prazo} dias
               </div>
 
