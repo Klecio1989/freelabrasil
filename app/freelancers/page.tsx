@@ -1,143 +1,60 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-export default function PainelFreelancer() {
-  const [usuario, setUsuario] = useState<any>(null);
+export default function FreelancersPage() {
+  const [freelas, setFreelas] = useState<any[]>([]);
+  const [busca, setBusca] = useState("");
 
   useEffect(() => {
-    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo));
-    }
+    carregar();
   }, []);
 
-  function badgePlano(plano?: string) {
-    if (plano === "pro") {
-      return (
-        <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">
-          👑 PRO
-        </span>
-      );
-    }
+  async function carregar() {
+    const { data } = await supabase
+      .from("ranking_freelancers")
+      .select("*")
+      .order("media", { ascending: false });
 
-    if (plano === "plus") {
-      return (
-        <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
-          💎 PLUS
-        </span>
-      );
-    }
-
-    return (
-      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">
-        GRATUITO
-      </span>
-    );
+    setFreelas(data || []);
   }
 
-  function cardDestaque(plano?: string) {
-    if (plano === "pro") return "border-purple-500/50 bg-purple-500/5";
-    if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/5";
-    return "border-white/10 bg-slate-900";
-  }
+  const filtrados = freelas.filter((f) =>
+    f.nome.toLowerCase().includes(busca.toLowerCase())
+  );
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-6 py-12">
-      <div
-        className={`p-10 rounded-2xl space-y-6 text-center w-full max-w-xl border ${cardDestaque(
-          usuario?.plano
-        )}`}
-      >
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <h1 className="text-3xl font-bold">Painel do Freelancer</h1>
-          {badgePlano(usuario?.plano)}
-        </div>
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-black mb-6">
+          Encontre freelancers ⭐
+        </h1>
 
-        <p className="text-slate-400">
-          Gerencie seus trabalhos, convites e desempenho
-        </p>
+        <input
+          placeholder="Buscar freelancer..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="w-full mb-6 bg-slate-900 border border-white/10 px-4 py-3 rounded-xl"
+        />
 
-        {usuario && (
-          <div className="bg-slate-800 rounded-xl p-4 text-left space-y-2">
-            <p>
-              Usuário: <b>{usuario.nome}</b>
-            </p>
-            <p>
-              Plano: <b>{usuario.plano || "gratuito"}</b>
-            </p>
-            <p>
-              Projetos concluídos:{" "}
-              <b>{usuario.projetos_concluidos || 0}</b>
-            </p>
-          </div>
-        )}
+        <div className="grid gap-4">
+          {filtrados.map((f) => (
+            <div
+              key={f.id}
+              className="bg-white/5 border border-white/10 p-5 rounded-2xl"
+            >
+              <h2 className="text-xl font-bold">{f.nome}</h2>
 
-        <div className="flex flex-col gap-4">
-          {/* 🔥 NOVO BOTÃO PRINCIPAL */}
-          <Link
-            href="/meus-trabalhos"
-            className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Meus Trabalhos
-          </Link>
+              <p className="text-yellow-300 mt-2">
+                ⭐ {Number(f.media).toFixed(1)} ({f.total_avaliacoes} avaliações)
+              </p>
 
-          <Link
-            href="/convites"
-            className="bg-yellow-400 text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Convites recebidos
-          </Link>
-
-          <Link
-            href="/propostas-enviadas"
-            className="bg-white text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Minhas propostas
-          </Link>
-
-          <Link
-            href="/projetos"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Buscar projetos
-          </Link>
-
-          <Link
-            href="/favoritos"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Projetos favoritos
-          </Link>
-
-          <Link
-            href="/notificacoes"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Notificações
-          </Link>
-
-          <Link
-            href="/perfil"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Meu perfil
-          </Link>
-
-          <Link
-            href="/dashboard"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Dashboard
-          </Link>
-
-          <Link
-            href="/planos"
-            className="bg-purple-500 text-white font-bold px-6 py-3 rounded-lg"
-          >
-            Alterar plano
-          </Link>
+              <p className="text-sm text-slate-400 mt-2">
+                {f.email}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </main>
