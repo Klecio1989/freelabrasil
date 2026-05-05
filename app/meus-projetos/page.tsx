@@ -69,25 +69,62 @@ export default function MeusProjetosPage() {
     }
   }
 
-  async function confirmarConclusao(item: any) {
-    const confirmar = confirm("Confirma que este projeto foi entregue corretamente?");
+  async function confirmarEntrega(item: any) {
+    const confirmar = confirm(
+      "Confirma que o projeto foi entregue corretamente? Após confirmar, você deverá avaliar o freelancer para liberar o pagamento."
+    );
+
     if (!confirmar) return;
 
     const { error } = await supabase
       .from("projetos_andamento")
       .update({
         status: "concluido",
+        data_finalizacao: new Date().toISOString(),
       })
       .eq("id", item.id);
 
     if (error) {
       console.error(error);
-      alert("Erro ao confirmar conclusão.");
+      alert("Erro ao confirmar entrega.");
       return;
     }
 
     await carregarProjetos(usuario.id);
-    setAvaliar({ ...item, status: "concluido" });
+
+    setAvaliar({
+      ...item,
+      status: "concluido",
+    });
+  }
+
+  async function liberarPagamento(item: any) {
+    const { error } = await supabase
+      .from("pagamentos")
+      .update({
+        status: "liberado",
+        liberado_at: new Date().toISOString(),
+      })
+      .eq("projeto_id", item.projeto_id);
+
+    if (error) {
+      console.error("Erro ao liberar pagamento:", error);
+      alert("Avaliação salva, porém houve erro ao liberar pagamento.");
+      return false;
+    }
+
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: item.freela_id,
+        titulo: "Pagamento liberado",
+        descricao:
+          "O contratante confirmou a entrega, avaliou seu trabalho e o pagamento foi liberado para saque.",
+        lida: false,
+        link: "/saques",
+      },
+    ]);
+
+    return true;
   }
 
   function jaAvaliado(item: any) {
@@ -104,17 +141,31 @@ export default function MeusProjetosPage() {
   }
 
   function corStatus(status: string) {
-    if (status === "concluido") return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
-    if (status === "finalizacao_solicitada" || status === "finalizado_freela") return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
+    if (status === "concluido") {
+      return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
+    }
+
+    if (status === "finalizacao_solicitada" || status === "finalizado_freela") {
+      return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
+    }
+
     return "text-blue-300 bg-blue-400/10 border-blue-400/20";
   }
 
   if (loading) {
-    return <main className="min-h-screen bg-slate-950 p-10 text-white">Carregando...</main>;
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Carregando...
+      </main>
+    );
   }
 
   if (!usuario) {
-    return <main className="min-h-screen bg-slate-950 p-10 text-white">Você precisa estar logado.</main>;
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Você precisa estar logado.
+      </main>
+    );
   }
 
   return (
@@ -124,7 +175,7 @@ export default function MeusProjetosPage() {
           <div>
             <h1 className="text-4xl font-black">Meus Projetos</h1>
             <p className="mt-3 text-slate-400">
-              Projetos contratados, em andamento, aguardando confirmação e concluídos.
+              Confirme entregas, avalie freelancers e libere pagamentos.
             </p>
           </div>
 
@@ -159,25 +210,50 @@ export default function MeusProjetosPage() {
                   </p>
                 </div>
 
-                <span className={`rounded-full border px-4 py-2 text-sm font-bold ${corStatus(item.status)}`}>
+                <span
+                  className={`rounded-full border px-4 py-2 text-sm font-bold ${corStatus(
+                    item.status
+                  )}`}
+                >
                   {traduzirStatus(item.status)}
                 </span>
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-4">
-                <Info titulo="Orçamento" valor={item.projetos?.orcamento ? `R$ ${item.projetos.orcamento}` : "-"} />
+                <Info
+                  titulo="Orçamento"
+                  valor={
+                    item.projetos?.orcamento
+                      ? `R$ ${item.projetos.orcamento}`
+                      : "-"
+                  }
+                />
+
                 <Info titulo="Prazo" valor={item.projetos?.prazo || "-"} />
-                <Info titulo="Categoria" valor={item.projetos?.categoria || item.projetos?.area || "-"} />
-                <Info titulo="Início" valor={item.data_inicio ? new Date(item.data_inicio).toLocaleDateString("pt-BR") : "-"} />
+
+                <Info
+                  titulo="Categoria"
+                  valor={item.projetos?.categoria || item.projetos?.area || "-"}
+                />
+
+                <Info
+                  titulo="Início"
+                  valor={
+                    item.data_inicio
+                      ? new Date(item.data_inicio).toLocaleDateString("pt-BR")
+                      : "-"
+                  }
+                />
               </div>
 
               <div className="mt-6 flex flex-wrap gap-4">
-                {(item.status === "finalizacao_solicitada" || item.status === "finalizado_freela") && (
+                {(item.status === "finalizacao_solicitada" ||
+                  item.status === "finalizado_freela") && (
                   <button
-                    onClick={() => confirmarConclusao(item)}
+                    onClick={() => confirmarEntrega(item)}
                     className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
                   >
-                    Confirmar entrega e avaliar freelancer
+                    Confirmar entrega e avaliar
                   </button>
                 )}
 
@@ -192,13 +268,13 @@ export default function MeusProjetosPage() {
                     onClick={() => setAvaliar(item)}
                     className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-slate-950"
                   >
-                    Avaliar freelancer
+                    Avaliar freelancer e liberar pagamento
                   </button>
                 )}
 
                 {item.status === "concluido" && jaAvaliado(item) && (
                   <p className="font-bold text-emerald-300">
-                    Projeto concluído e freelancer avaliado.
+                    Projeto concluído, avaliado e pagamento liberado.
                   </p>
                 )}
               </div>
@@ -211,9 +287,17 @@ export default function MeusProjetosPage() {
             projeto={avaliar}
             usuario={usuario}
             onClose={() => setAvaliar(null)}
-            onSuccess={() => {
-              carregarProjetos(usuario.id);
-              carregarAvaliacoesFeitas(usuario.id);
+            onSuccess={async () => {
+              const liberado = await liberarPagamento(avaliar);
+
+              await carregarProjetos(usuario.id);
+              await carregarAvaliacoesFeitas(usuario.id);
+
+              setAvaliar(null);
+
+              if (liberado) {
+                alert("Avaliação enviada e pagamento liberado com sucesso!");
+              }
             }}
           />
         )}
