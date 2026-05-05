@@ -1,26 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-export default function SaquesPage() {
+export default function AdminSaquesPage() {
   const [usuario, setUsuario] = useState<any>(null);
-  const [saldo, setSaldo] = useState(0);
-  const [valor, setValor] = useState("");
-  const [chavePix, setChavePix] = useState("");
   const [saques, setSaques] = useState<any[]>([]);
+  const [usuariosMap, setUsuariosMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregarDados();
+    carregar();
   }, []);
 
-  function valorParaNumero(valor: string) {
-    return Number(valor.replace(",", "."));
-  }
+  async function carregar() {
+    setLoading(true);
 
-  async function carregarDados() {
     const user = localStorage.getItem("freelabrasil_usuario");
 
     if (!user) {
@@ -31,175 +27,276 @@ export default function SaquesPage() {
     const parsed = JSON.parse(user);
     setUsuario(parsed);
 
-    const { data: pagamentos } = await supabase
-      .from("pagamentos")
-      .select("valor_freelancer")
-      .eq("freela_id", parsed.id)
-      .eq("status", "liberado");
+    if (parsed.role !== "admin") {
+      setLoading(false);
+      return;
+    }
 
-    const totalRecebido =
-      pagamentos?.reduce(
-        (acc: number, p: any) => acc + Number(p.valor_freelancer || 0),
-        0
-      ) || 0;
-
-    const { data: saquesData } = await supabase
-      .from("saques")
-      .select("valor,status")
-      .eq("freela_id", parsed.id);
-
-    const totalSacado =
-      saquesData?.reduce((acc: number, s: any) => {
-        if (s.status === "pendente" || s.status === "pago") {
-          return acc + Number(s.valor || 0);
-        }
-        return acc;
-      }, 0) || 0;
-
-    setSaldo(Math.max(totalRecebido - totalSacado, 0));
-
-    const { data: historico } = await supabase
+    const { data, error } = await supabase
       .from("saques")
       .select("*")
-      .eq("freela_id", parsed.id)
       .order("created_at", { ascending: false });
 
-    setSaques(historico || []);
+    if (error) {
+      console.error(error);
+      alert("Erro ao carregar saques.");
+      setLoading(false);
+      return;
+    }
+
+    const lista = data || [];
+    setSaques(lista);
+
+    const freelaIds = [
+      ...new Set(lista.map((s: any) => s.freela_id).filter(Boolean)),
+    ];
+
+    if (freelaIds.length > 0) {
+      const { data: usuariosData } = await supabase
+        .from("usuarios")
+        .select("id,nome,email,status_conta")
+        .in("id", freelaIds);
+
+      const mapa = Object.fromEntries(
+        (usuariosData || []).map((u: any) => [u.id, u])
+      );
+
+      setUsuariosMap(mapa);
+    } else {
+      setUsuariosMap({});
+    }
+
     setLoading(false);
   }
 
-  async function solicitarSaque() {
-    const valorNumero = valorParaNumero(valor);
-
-    if (!valorNumero || valorNumero <= 0) {
-      alert("Digite um valor válido.");
-      return;
-    }
-
-    if (valorNumero > saldo) {
-      alert("Saldo insuficiente.");
-      return;
-    }
-
-    if (!chavePix.trim()) {
-      alert("Informe sua chave PIX.");
-      return;
-    }
-
+  async function atualizarStatus(id: string, status: "pago" | "cancelado") {
     const confirmar = confirm(
-      `Confirma saque de R$ ${valorNumero.toFixed(2)} para a chave PIX ${chavePix}?`
+      status === "pago"
+        ? "Confirma que este saque foi pago via PIX?"
+        : "Confirma o cancelamento deste saque?"
     );
 
     if (!confirmar) return;
 
-    const { error } = await supabase.from("saques").insert([
-      {
-        freela_id: usuario.id,
-        valor: valorNumero,
-        chave_pix: chavePix.trim(),
-        status: "pendente",
-      },
-    ]);
+    const payload: any = { status };
+
+    if (status === "pago") {
+      payload.pago_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from("saques")
+      .update(payload)
+      .eq("id", id);
 
     if (error) {
       console.error(error);
-      alert("Erro ao solicitar saque.");
+      alert("Erro ao atualizar saque.");
       return;
     }
 
-    alert("Saque solicitado com sucesso!");
-    setValor("");
-    setChavePix("");
-    carregarDados();
+    alert(status === "pago" ? "Saque marcado como pago." : "Saque cancelado.");
+    carregar();
   }
 
-  function statusCor(status: string) {
-    if (status === "pendente")
-      return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
+  function formatar(valor: number) {
+    return valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }
+
+  function corStatus(status: string) {
     if (status === "pago")
       return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
-    return "text-red-300 bg-red-400/10 border-red-400/20";
+
+    if (status === "cancelado")
+      return "text-red-300 bg-red-400/10 border-red-400/20";
+
+    return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
   }
 
+  const pendentes = saques.filter((s) => s.status === "pendente").length;
+  const pagos = saques.filter((s) => s.status === "pago").length;
+  const cancelados = saques.filter((s) => s.status === "cancelado").length;
+
   if (loading) {
-    return <main className="min-h-screen bg-slate-950 p-10 text-white">Carregando...</main>;
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Carregando...
+      </main>
+    );
+  }
+
+  if (!usuario) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        Você precisa estar logado.
+      </main>
+    );
+  }
+
+  if (usuario.role !== "admin") {
+    return (
+      <main className="min-h-screen bg-slate-950 p-10 text-white">
+        <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
+          <h1 className="text-3xl font-black text-red-300">Acesso negado</h1>
+          <p className="mt-3 text-slate-300">
+            Esta área é exclusiva para administradores.
+          </p>
+
+          <Link
+            href="/"
+            className="mt-6 inline-block rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
+          >
+            Voltar ao início
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-10 flex justify-between items-center">
+      <section className="mx-auto max-w-7xl">
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black">Saques</h1>
-            <p className="text-slate-400 mt-2">
-              Solicite saque dos valores liberados.
+            <h1 className="text-4xl font-black">Admin - Saques</h1>
+            <p className="mt-3 text-slate-400">
+              Aprove, cancele e acompanhe solicitações de saque dos freelancers.
             </p>
           </div>
 
-          <Link href="/painel-freelancer" className="border px-4 py-2 rounded-xl">
+          <Link
+            href="/admin"
+            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+          >
             Voltar
           </Link>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl mb-6">
-          <p className="text-slate-400">Saldo disponível</p>
-          <h2 className="text-3xl font-black text-emerald-300">
-            R$ {saldo.toFixed(2)}
-          </h2>
+        <div className="mb-8 grid gap-4 md:grid-cols-4">
+          <Card titulo="Total" valor={String(saques.length)} />
+          <Card titulo="Pendentes" valor={String(pendentes)} amarelo />
+          <Card titulo="Pagos" valor={String(pagos)} verde />
+          <Card titulo="Cancelados" valor={String(cancelados)} vermelho />
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl mb-10">
-          <h3 className="text-xl font-bold mb-4">Solicitar saque</h3>
-
-          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-            <input
-              placeholder="Digite o valor"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className="bg-slate-900 border border-white/10 px-4 py-3 rounded-xl"
-            />
-
-            <input
-              placeholder="Chave PIX"
-              value={chavePix}
-              onChange={(e) => setChavePix(e.target.value)}
-              className="bg-slate-900 border border-white/10 px-4 py-3 rounded-xl"
-            />
-
-            <button
-              onClick={solicitarSaque}
-              className="bg-emerald-400 text-black px-6 py-3 rounded-xl font-bold"
-            >
-              Solicitar
-            </button>
+        {saques.length === 0 && (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            Nenhum saque solicitado.
           </div>
-        </div>
+        )}
 
-        <div className="space-y-4">
-          {saques.length === 0 && (
-            <p className="text-slate-400">Nenhum saque solicitado.</p>
-          )}
+        <div className="grid gap-5">
+          {saques.map((s) => {
+            const freela = usuariosMap[s.freela_id];
 
-          {saques.map((s) => (
-            <div
-              key={s.id}
-              className="bg-white/5 border border-white/10 p-4 rounded-xl flex justify-between gap-4"
-            >
-              <div>
-                <p className="font-bold">R$ {Number(s.valor).toFixed(2)}</p>
-                <p className="text-sm text-slate-400">PIX: {s.chave_pix || "-"}</p>
-                <p className="text-sm text-slate-500">
-                  {new Date(s.created_at).toLocaleString("pt-BR")}
-                </p>
+            return (
+              <div
+                key={s.id}
+                className="rounded-3xl border border-white/10 bg-slate-900 p-6"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black">
+                      {formatar(Number(s.valor || 0))}
+                    </h2>
+
+                    <p className="mt-2 text-sm text-slate-300">
+                      Freelancer:{" "}
+                      <span className="font-bold">
+                        {freela?.nome || "Não localizado"}
+                      </span>
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-400">
+                      Email: {freela?.email || "-"}
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-400">
+                      Freela ID: {s.freela_id}
+                    </p>
+
+                    <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+                      <p className="text-sm text-emerald-200">Chave PIX</p>
+                      <p className="mt-1 break-all text-lg font-black text-emerald-300">
+                        {s.chave_pix || "Não informada"}
+                      </p>
+                    </div>
+
+                    {s.created_at && (
+                      <p className="mt-4 text-sm text-slate-500">
+                        Solicitado em{" "}
+                        {new Date(s.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+
+                  <span
+                    className={`rounded-full border px-4 py-2 text-sm font-bold ${corStatus(
+                      s.status
+                    )}`}
+                  >
+                    {s.status || "pendente"}
+                  </span>
+                </div>
+
+                {s.status === "pendente" && (
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      onClick={() => atualizarStatus(s.id, "pago")}
+                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
+                    >
+                      Marcar como pago
+                    </button>
+
+                    <button
+                      onClick={() => atualizarStatus(s.id, "cancelado")}
+                      className="rounded-xl border border-red-400 px-5 py-3 font-bold text-red-300"
+                    >
+                      Cancelar saque
+                    </button>
+                  </div>
+                )}
+
+                {s.status === "pago" && s.pago_at && (
+                  <p className="mt-4 font-bold text-emerald-300">
+                    Pago em {new Date(s.pago_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
               </div>
-
-              <span className={`px-3 py-1 rounded-full text-sm border h-fit ${statusCor(s.status)}`}>
-                {s.status}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </div>
+      </section>
     </main>
+  );
+}
+
+function Card({
+  titulo,
+  valor,
+  verde,
+  amarelo,
+  vermelho,
+}: {
+  titulo: string;
+  valor: string;
+  verde?: boolean;
+  amarelo?: boolean;
+  vermelho?: boolean;
+}) {
+  let classe = "border-white/10 bg-white/5";
+
+  if (verde) classe = "border-emerald-400/30 bg-emerald-400/10";
+  if (amarelo) classe = "border-yellow-400/30 bg-yellow-400/10";
+  if (vermelho) classe = "border-red-400/30 bg-red-400/10";
+
+  return (
+    <div className={`rounded-2xl border p-5 ${classe}`}>
+      <p className="text-sm text-slate-400">{titulo}</p>
+      <p className="mt-2 text-2xl font-black">{valor}</p>
+    </div>
   );
 }
