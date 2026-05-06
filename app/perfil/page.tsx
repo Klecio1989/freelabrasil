@@ -63,6 +63,12 @@ export default function PerfilPage() {
     }
   }, []);
 
+  function limitePortfolio(plano?: string) {
+    if (plano === "pro") return 30;
+    if (plano === "plus") return 10;
+    return 5;
+  }
+
   async function carregarPortfolio(usuarioId: string) {
     const { data, error } = await supabase
       .from("portfolio")
@@ -135,7 +141,6 @@ export default function PerfilPage() {
         });
 
       if (uploadError) {
-        console.error("ERRO UPLOAD AVATAR:", uploadError);
         alert("Erro no upload: " + uploadError.message);
         return;
       }
@@ -155,7 +160,6 @@ export default function PerfilPage() {
         .eq("id", usuario.id);
 
       if (error) {
-        console.error("ERRO SALVAR FOTO BANCO:", error);
         alert("Erro ao salvar foto no banco.");
         return;
       }
@@ -174,9 +178,6 @@ export default function PerfilPage() {
       );
 
       alert("Foto atualizada com sucesso!");
-    } catch (error) {
-      console.error("ERRO INESPERADO FOTO:", error);
-      alert("Erro inesperado ao enviar imagem.");
     } finally {
       setEnviandoFoto(false);
       if (event.target) event.target.value = "";
@@ -185,6 +186,15 @@ export default function PerfilPage() {
 
   async function salvarProjetoPortfolio() {
     if (!usuario) return;
+
+    const limite = limitePortfolio(usuario.plano);
+
+    if (portfolio.length >= limite) {
+      alert(
+        `Seu plano permite até ${limite} projetos no portfólio. Para adicionar mais projetos, altere seu plano.`
+      );
+      return;
+    }
 
     if (!portfolioTitulo.trim() || !portfolioDescricao.trim()) {
       alert("Informe título e descrição do projeto.");
@@ -205,14 +215,20 @@ export default function PerfilPage() {
         }
 
         const extensao = portfolioImagem.name.split(".").pop();
-        const nomeArquivo = `${usuario.id}/${Date.now()}.${extensao}`;
+        const nomeArquivo = `${usuario.id}/${Date.now()}-${portfolioImagem.name
+          .replace(/\s/g, "-")
+          .toLowerCase()}`;
 
         const { error: uploadError } = await supabase.storage
           .from("portfolio")
-          .upload(nomeArquivo, portfolioImagem, { upsert: true });
+          .upload(nomeArquivo, portfolioImagem, {
+            cacheControl: "3600",
+            upsert: true,
+          });
 
         if (uploadError) {
-          alert("Erro ao enviar imagem do portfólio.");
+          console.error("ERRO UPLOAD PORTFOLIO:", uploadError);
+          alert("Erro ao enviar imagem do portfólio: " + uploadError.message);
           return;
         }
 
@@ -408,6 +424,8 @@ export default function PerfilPage() {
     );
   }
 
+  const limite = limitePortfolio(usuario.plano);
+
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
       <div className="max-w-6xl mx-auto">
@@ -420,7 +438,7 @@ export default function PerfilPage() {
           <div className="flex gap-3">
             {usuario.tipo_usuario === "freelancer" && (
               <Link
-                href={`/freelancers/${usuario.id}`}
+                href={`/freelancer/${usuario.id}`}
                 className="bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold"
               >
                 Ver página pública
@@ -457,7 +475,6 @@ export default function PerfilPage() {
                 className={`w-32 h-32 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center border border-white/10 ${
                   editando ? "cursor-pointer hover:opacity-80" : "cursor-default"
                 }`}
-                title={editando ? "Clique para alterar a foto" : ""}
               >
                 {fotoUrl ? (
                   <img
@@ -493,100 +510,51 @@ export default function PerfilPage() {
               {!editando ? (
                 <>
                   <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-slate-800 rounded-xl p-5">
-                      <p className="text-sm text-slate-400">Nome</p>
-                      <p className="text-xl font-bold mt-1">{usuario.nome}</p>
-                    </div>
-
-                    <div className="bg-slate-800 rounded-xl p-5">
-                      <p className="text-sm text-slate-400">Email</p>
-                      <p className="text-xl font-bold mt-1">{usuario.email}</p>
-                    </div>
-
-                    <div className="bg-slate-800 rounded-xl p-5">
-                      <p className="text-sm text-slate-400">Cidade</p>
-                      <p className="text-xl font-bold mt-1">
-                        {usuario.cidade || "-"}
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-800 rounded-xl p-5">
-                      <p className="text-sm text-slate-400">Plano</p>
-                      <p className="text-xl font-bold mt-1 capitalize">
-                        {usuario.plano || "gratuito"}
-                      </p>
-                    </div>
+                    <Info titulo="Nome" valor={usuario.nome} />
+                    <Info titulo="Email" valor={usuario.email} />
+                    <Info titulo="Cidade" valor={usuario.cidade || "-"} />
+                    <Info titulo="Plano" valor={usuario.plano || "gratuito"} />
                   </div>
 
-                  <div className="bg-slate-800 rounded-xl p-5">
-                    <p className="text-sm text-slate-400">Descrição</p>
-                    <p className="text-base mt-2 text-slate-200">
-                      {usuario.descricao || "Nenhuma descrição cadastrada."}
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-800 rounded-xl p-5">
-                    <p className="text-sm text-slate-400">Habilidades</p>
-                    <p className="text-base mt-2 text-slate-200">
-                      {usuario.habilidades || "Nenhuma habilidade cadastrada."}
-                    </p>
-                  </div>
+                  <Bloco titulo="Descrição" texto={usuario.descricao || "Nenhuma descrição cadastrada."} />
+                  <Bloco titulo="Habilidades" texto={usuario.habilidades || "Nenhuma habilidade cadastrada."} />
 
                   <div className="bg-slate-800 rounded-xl p-5">
                     <p className="text-sm text-slate-400">Portfólio externo</p>
                     {usuario.portfolio_url ? (
-                      <a
-                        href={usuario.portfolio_url}
-                        target="_blank"
-                        className="text-emerald-400 mt-2 inline-block"
-                      >
+                      <a href={usuario.portfolio_url} target="_blank" className="text-emerald-400 mt-2 inline-block">
                         Abrir portfólio
                       </a>
                     ) : (
-                      <p className="text-base mt-2 text-slate-200">
-                        Nenhum link externo cadastrado.
-                      </p>
+                      <p className="text-base mt-2 text-slate-200">Nenhum link externo cadastrado.</p>
                     )}
                   </div>
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <div className="bg-slate-800 rounded-xl p-5">
-                      <h3 className="text-2xl font-bold">Projetos do portfólio</h3>
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <h3 className="text-2xl font-bold">Projetos do portfólio</h3>
+                        <span className="rounded-full bg-slate-900 px-3 py-1 text-sm font-bold text-slate-300">
+                          {portfolio.length} de {limite} usados
+                        </span>
+                      </div>
 
                       {portfolio.length === 0 && (
-                        <p className="mt-3 text-slate-400">
-                          Nenhum projeto cadastrado ainda.
-                        </p>
+                        <p className="mt-3 text-slate-400">Nenhum projeto cadastrado ainda.</p>
                       )}
 
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
                         {portfolio.map((item) => (
-                          <div
-                            key={item.id}
-                            className="rounded-2xl border border-white/10 bg-slate-900 p-4"
-                          >
+                          <div key={item.id} className="rounded-2xl border border-white/10 bg-slate-900 p-4">
                             {item.imagem_url && (
-                              <img
-                                src={item.imagem_url}
-                                alt={item.titulo}
-                                className="h-40 w-full rounded-xl object-cover"
-                              />
+                              <img src={item.imagem_url} alt={item.titulo} className="h-40 w-full rounded-xl object-cover" />
                             )}
 
-                            <h4 className="mt-4 text-xl font-bold">
-                              {item.titulo}
-                            </h4>
-
-                            <p className="mt-2 text-sm text-slate-300">
-                              {item.descricao}
-                            </p>
+                            <h4 className="mt-4 text-xl font-bold">{item.titulo}</h4>
+                            <p className="mt-2 text-sm text-slate-300">{item.descricao}</p>
 
                             {item.link_url && (
-                              <a
-                                href={item.link_url}
-                                target="_blank"
-                                className="mt-3 inline-block text-emerald-400"
-                              >
+                              <a href={item.link_url} target="_blank" className="mt-3 inline-block text-emerald-400">
                                 Abrir projeto
                               </a>
                             )}
@@ -604,17 +572,11 @@ export default function PerfilPage() {
                   )}
 
                   <div className="flex flex-wrap gap-4">
-                    <button
-                      onClick={() => setEditando(true)}
-                      className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
-                    >
+                    <button onClick={() => setEditando(true)} className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg">
                       Editar perfil
                     </button>
 
-                    <Link
-                      href="/planos"
-                      className="bg-purple-500 text-white font-bold px-6 py-3 rounded-lg"
-                    >
+                    <Link href="/planos" className="bg-purple-500 text-white font-bold px-6 py-3 rounded-lg">
                       Alterar plano
                     </Link>
 
@@ -629,95 +591,48 @@ export default function PerfilPage() {
                 </>
               ) : (
                 <div className="space-y-5">
-                  <input
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    placeholder="Nome"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
+                  <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <input value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} placeholder="URL do portfólio externo" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
 
-                  <input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
-
-                  <input
-                    value={cidade}
-                    onChange={(e) => setCidade(e.target.value)}
-                    placeholder="Cidade"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
-
-                  <input
-                    value={portfolioUrl}
-                    onChange={(e) => setPortfolioUrl(e.target.value)}
-                    placeholder="URL do portfólio externo"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
-
-                  <textarea
-                    value={habilidades}
-                    onChange={(e) => setHabilidades(e.target.value)}
-                    rows={3}
-                    placeholder="Habilidades"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
-
-                  <textarea
-                    value={descricao}
-                    onChange={(e) => setDescricao(e.target.value)}
-                    rows={5}
-                    placeholder="Descrição"
-                    className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                  />
+                  <textarea value={habilidades} onChange={(e) => setHabilidades(e.target.value)} rows={3} placeholder="Habilidades" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                  <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={5} placeholder="Descrição" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
-                      <h3 className="text-lg font-bold">
-                        Adicionar projeto ao portfólio
-                      </h3>
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <h3 className="text-lg font-bold">Adicionar projeto ao portfólio</h3>
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-sm font-bold text-slate-300">
+                          {portfolio.length} de {limite} usados
+                        </span>
+                      </div>
 
-                      <input
-                        value={portfolioTitulo}
-                        onChange={(e) => setPortfolioTitulo(e.target.value)}
-                        placeholder="Título do projeto"
-                        className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                      />
+                      <p className="text-sm text-slate-400">
+                        Limites: Gratuito 5 projetos, Plus 10 projetos, Pro 30 projetos.
+                      </p>
 
-                      <textarea
-                        value={portfolioDescricao}
-                        onChange={(e) => setPortfolioDescricao(e.target.value)}
-                        rows={4}
-                        placeholder="Descrição do projeto"
-                        className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                      />
-
-                      <input
-                        value={portfolioLink}
-                        onChange={(e) => setPortfolioLink(e.target.value)}
-                        placeholder="Link do projeto"
-                        className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                      />
+                      <input value={portfolioTitulo} onChange={(e) => setPortfolioTitulo(e.target.value)} placeholder="Título do projeto" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                      <textarea value={portfolioDescricao} onChange={(e) => setPortfolioDescricao(e.target.value)} rows={4} placeholder="Descrição do projeto" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                      <input value={portfolioLink} onChange={(e) => setPortfolioLink(e.target.value)} placeholder="Link do projeto" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
 
                       <input
                         id="portfolio-imagem"
                         type="file"
                         accept="image/png,image/jpeg,image/jpg"
-                        onChange={(e) =>
-                          setPortfolioImagem(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => setPortfolioImagem(e.target.files?.[0] || null)}
                         className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
                       />
 
                       <button
                         onClick={salvarProjetoPortfolio}
-                        disabled={salvandoPortfolio}
+                        disabled={salvandoPortfolio || portfolio.length >= limite}
                         className="rounded-xl bg-purple-500 px-6 py-3 font-bold text-white disabled:opacity-60"
                       >
                         {salvandoPortfolio
                           ? "Salvando projeto..."
+                          : portfolio.length >= limite
+                          ? "Limite do plano atingido"
                           : "Adicionar ao portfólio"}
                       </button>
                     </div>
@@ -725,42 +640,15 @@ export default function PerfilPage() {
 
                   <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 space-y-4">
                     <h3 className="text-lg font-bold">Alterar senha opcional</h3>
+                    <p className="text-sm text-slate-400">Preencha apenas se quiser trocar sua senha.</p>
 
-                    <p className="text-sm text-slate-400">
-                      Preencha apenas se quiser trocar sua senha.
-                    </p>
-
-                    <input
-                      type="password"
-                      value={senhaAtual}
-                      onChange={(e) => setSenhaAtual(e.target.value)}
-                      placeholder="Senha atual"
-                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                    />
-
-                    <input
-                      type="password"
-                      value={novaSenha}
-                      onChange={(e) => setNovaSenha(e.target.value)}
-                      placeholder="Nova senha"
-                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                    />
-
-                    <input
-                      type="password"
-                      value={confirmarNovaSenha}
-                      onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                      placeholder="Confirmar nova senha"
-                      className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3"
-                    />
+                    <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} placeholder="Senha atual" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                    <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Nova senha" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
+                    <input type="password" value={confirmarNovaSenha} onChange={(e) => setConfirmarNovaSenha(e.target.value)} placeholder="Confirmar nova senha" className="w-full rounded-xl bg-slate-800 border border-white/10 px-4 py-3" />
                   </div>
 
                   <div className="flex gap-4">
-                    <button
-                      onClick={salvarPerfil}
-                      disabled={salvando}
-                      className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg disabled:opacity-60"
-                    >
+                    <button onClick={salvarPerfil} disabled={salvando} className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg disabled:opacity-60">
                       {salvando ? "Salvando..." : "Salvar"}
                     </button>
 
@@ -783,5 +671,23 @@ export default function PerfilPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function Info({ titulo, valor }: { titulo: string; valor: string }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-5">
+      <p className="text-sm text-slate-400">{titulo}</p>
+      <p className="text-xl font-bold mt-1 capitalize">{valor}</p>
+    </div>
+  );
+}
+
+function Bloco({ titulo, texto }: { titulo: string; texto: string }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-5">
+      <p className="text-sm text-slate-400">{titulo}</p>
+      <p className="text-base mt-2 text-slate-200">{texto}</p>
+    </div>
   );
 }
