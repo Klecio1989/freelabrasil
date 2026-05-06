@@ -64,9 +64,9 @@ export default function PerfilPage() {
   }, []);
 
   function limitePortfolio(plano?: string) {
-    if (plano === "pro") return 30;
-    if (plano === "plus") return 10;
-    return 5;
+    if (plano === "pro") return 10;
+    if (plano === "plus") return 5;
+    return 2;
   }
 
   async function carregarPortfolio(usuarioId: string) {
