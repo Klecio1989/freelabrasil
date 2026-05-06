@@ -9,12 +9,25 @@ export default function FreelancerPublicPage() {
   const params = useParams();
   const id = params?.id as string;
 
+  const [usuarioLogado, setUsuarioLogado] = useState<any>(null);
+
   const [freela, setFreela] = useState<any>(null);
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  const [modalDenuncia, setModalDenuncia] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [enviandoDenuncia, setEnviandoDenuncia] = useState(false);
+
   useEffect(() => {
+    const user = localStorage.getItem("freelabrasil_usuario");
+
+    if (user) {
+      setUsuarioLogado(JSON.parse(user));
+    }
+
     if (id) carregar();
   }, [id]);
 
@@ -87,6 +100,48 @@ export default function FreelancerPublicPage() {
       .filter(Boolean);
   }
 
+  async function enviarDenuncia() {
+    if (!usuarioLogado) {
+      alert("Faça login para denunciar.");
+      return;
+    }
+
+    if (!motivo) {
+      alert("Selecione o motivo.");
+      return;
+    }
+
+    try {
+      setEnviandoDenuncia(true);
+
+      const { error } = await supabase.from("denuncias").insert([
+        {
+          denunciante_id: usuarioLogado.id,
+          denunciado_id: freela.id,
+          motivo,
+          descricao,
+        },
+      ]);
+
+      if (error) {
+        console.error(error);
+        alert("Erro ao enviar denúncia.");
+        return;
+      }
+
+      alert("Denúncia enviada com sucesso.");
+
+      setModalDenuncia(false);
+      setMotivo("");
+      setDescricao("");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao enviar denúncia.");
+    } finally {
+      setEnviandoDenuncia(false);
+    }
+  }
+
   if (carregando) {
     return (
       <main className="min-h-screen bg-slate-950 p-10 text-white">
@@ -106,13 +161,23 @@ export default function FreelancerPublicPage() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <section className="mx-auto max-w-7xl">
-        <Link href="/freelancers" className="text-sm font-bold text-emerald-300">
+
+        <Link
+          href="/freelancers"
+          className="text-sm font-bold text-emerald-300"
+        >
           ← Voltar para freelancers
         </Link>
 
-        <div className={`mt-6 rounded-[2rem] border p-8 ${corPlano(freela.plano)}`}>
+        <div
+          className={`mt-6 rounded-[2rem] border p-8 ${corPlano(
+            freela.plano
+          )}`}
+        >
           <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
+
             <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-slate-900 p-6 text-center">
+
               <div className="h-36 w-36 overflow-hidden rounded-full border border-white/10 bg-slate-800">
                 {freela.foto_url ? (
                   <img
@@ -127,7 +192,9 @@ export default function FreelancerPublicPage() {
                 )}
               </div>
 
-              <h1 className="mt-5 text-2xl font-black">{freela.nome}</h1>
+              <h1 className="mt-5 text-2xl font-black">
+                {freela.nome}
+              </h1>
 
               <span className="mt-3 rounded-full border border-white/10 bg-slate-950 px-4 py-2 text-xs font-black">
                 {badgePlano(freela.plano)}
@@ -147,18 +214,31 @@ export default function FreelancerPublicPage() {
               >
                 Convidar para projeto
               </Link>
+
+              <button
+                onClick={() => setModalDenuncia(true)}
+                className="mt-3 w-full rounded-xl border border-red-400/20 bg-red-500/10 px-5 py-3 text-sm font-bold text-red-300"
+              >
+                Denunciar usuário
+              </button>
             </div>
 
             <div>
               <div className="rounded-3xl border border-white/10 bg-slate-900 p-6">
-                <h2 className="text-3xl font-black">Sobre o freelancer</h2>
+
+                <h2 className="text-3xl font-black">
+                  Sobre o freelancer
+                </h2>
 
                 <p className="mt-4 leading-8 text-slate-300">
-                  {freela.descricao || "Este freelancer ainda não adicionou uma descrição profissional."}
+                  {freela.descricao ||
+                    "Este freelancer ainda não adicionou uma descrição profissional."}
                 </p>
 
                 <div className="mt-6">
-                  <h3 className="mb-3 text-lg font-black">Habilidades</h3>
+                  <h3 className="mb-3 text-lg font-black">
+                    Habilidades
+                  </h3>
 
                   <div className="flex flex-wrap gap-2">
                     {separarTags(freela.habilidades).length > 0 ? (
@@ -171,7 +251,9 @@ export default function FreelancerPublicPage() {
                         </span>
                       ))
                     ) : (
-                      <p className="text-slate-400">Nenhuma habilidade cadastrada.</p>
+                      <p className="text-slate-400">
+                        Nenhuma habilidade cadastrada.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -191,7 +273,9 @@ export default function FreelancerPublicPage() {
         </div>
 
         <div className="mt-10">
-          <h2 className="mb-5 text-3xl font-black">Projetos do portfólio</h2>
+          <h2 className="mb-5 text-3xl font-black">
+            Projetos do portfólio
+          </h2>
 
           {portfolio.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-slate-400">
@@ -199,6 +283,7 @@ export default function FreelancerPublicPage() {
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+
               {portfolio.map((item) => (
                 <div
                   key={item.id}
@@ -212,7 +297,9 @@ export default function FreelancerPublicPage() {
                     />
                   )}
 
-                  <h3 className="mt-4 text-xl font-black">{item.titulo}</h3>
+                  <h3 className="mt-4 text-xl font-black">
+                    {item.titulo}
+                  </h3>
 
                   <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-300">
                     {item.descricao}
@@ -229,12 +316,15 @@ export default function FreelancerPublicPage() {
                   )}
                 </div>
               ))}
+
             </div>
           )}
         </div>
 
         <div className="mt-10">
-          <h2 className="mb-5 text-3xl font-black">Avaliações</h2>
+          <h2 className="mb-5 text-3xl font-black">
+            Avaliações
+          </h2>
 
           {avaliacoes.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-slate-400">
@@ -242,6 +332,7 @@ export default function FreelancerPublicPage() {
             </div>
           ) : (
             <div className="grid gap-4">
+
               {avaliacoes.map((avaliacao) => (
                 <div
                   key={avaliacao.id}
@@ -262,9 +353,85 @@ export default function FreelancerPublicPage() {
                   )}
                 </div>
               ))}
+
             </div>
           )}
         </div>
+
+        {/* MODAL DENÚNCIA */}
+        {modalDenuncia && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+
+            <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6">
+
+              <h2 className="text-2xl font-black">
+                Denunciar usuário
+              </h2>
+
+              <p className="mt-2 text-slate-400">
+                Sua denúncia será analisada pela equipe da plataforma.
+              </p>
+
+              <select
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                className="mt-6 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3"
+              >
+                <option value="">Selecione o motivo</option>
+
+                <option value="Contato externo">
+                  Contato externo
+                </option>
+
+                <option value="Golpe/Fraude">
+                  Golpe/Fraude
+                </option>
+
+                <option value="Desrespeito">
+                  Desrespeito
+                </option>
+
+                <option value="Spam">
+                  Spam
+                </option>
+
+                <option value="Conteúdo impróprio">
+                  Conteúdo impróprio
+                </option>
+              </select>
+
+              <textarea
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Descreva o ocorrido"
+                rows={5}
+                className="mt-4 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3"
+              />
+
+              <div className="mt-6 flex gap-3">
+
+                <button
+                  onClick={enviarDenuncia}
+                  disabled={enviandoDenuncia}
+                  className="flex-1 rounded-xl bg-red-500 px-6 py-3 font-black text-white disabled:opacity-60"
+                >
+                  {enviandoDenuncia
+                    ? "Enviando..."
+                    : "Enviar denúncia"}
+                </button>
+
+                <button
+                  onClick={() => setModalDenuncia(false)}
+                  className="flex-1 rounded-xl border border-white/10 px-6 py-3 font-bold"
+                >
+                  Cancelar
+                </button>
+
+              </div>
+            </div>
+          </div>
+        )}
+
       </section>
     </main>
   );
