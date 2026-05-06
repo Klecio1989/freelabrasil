@@ -7,151 +7,113 @@ import { supabase } from "@/lib/supabase";
 export default function Navbar() {
   const [usuario, setUsuario] = useState<any>(null);
   const [menuAberto, setMenuAberto] = useState(false);
-  const [saldoDisponivel, setSaldoDisponivel] = useState(0);
+  const [notificacoesAberto, setNotificacoesAberto] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<any[]>([]);
 
   useEffect(() => {
-    carregarUsuario();
-
-    window.addEventListener("storage", carregarUsuario);
-    window.addEventListener("focus", carregarUsuario);
-
-    return () => {
-      window.removeEventListener("storage", carregarUsuario);
-      window.removeEventListener("focus", carregarUsuario);
-    };
-  }, []);
-
-  function carregarUsuario() {
     const user = localStorage.getItem("freelabrasil_usuario");
 
-    if (!user) {
-      setUsuario(null);
+    if (user) {
+      const parsed = JSON.parse(user);
+      setUsuario(parsed);
+      carregarNotificacoes(parsed.id);
+      iniciarRealtime(parsed.id);
+    }
+  }, []);
+
+  async function carregarNotificacoes(usuarioId: string) {
+    const { data, error } = await supabase
+      .from("notificacoes")
+      .select("*")
+      .eq("usuario_id", usuarioId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("Erro ao carregar notificações:", error);
       return;
     }
 
-    const parsed = JSON.parse(user);
-    setUsuario(parsed);
+    setNotificacoes(data || []);
+  }
 
-    if (parsed.tipo_usuario === "freelancer") {
-      carregarSaldo(parsed.id);
+  function iniciarRealtime(usuarioId: string) {
+    const channel = supabase
+      .channel(`notificacoes-navbar-${usuarioId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notificacoes",
+          filter: `usuario_id=eq.${usuarioId}`,
+        },
+        () => {
+          carregarNotificacoes(usuarioId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }
+
+  async function marcarComoLida(id: string, link?: string) {
+    await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
+
+    if (usuario?.id) {
+      await carregarNotificacoes(usuario.id);
+    }
+
+    if (link) {
+      window.location.href = link;
     }
   }
 
-  async function carregarSaldo(freelaId: string) {
-    const { data: pagamentos } = await supabase
-      .from("pagamentos")
-      .select("valor_freelancer")
-      .eq("freela_id", freelaId)
-      .eq("status", "liberado");
+  async function marcarTodasComoLidas() {
+    if (!usuario?.id) return;
 
-    const { data: saques } = await supabase
-      .from("saques")
-      .select("valor,status")
-      .eq("freela_id", freelaId);
+    await supabase
+      .from("notificacoes")
+      .update({ lida: true })
+      .eq("usuario_id", usuario.id)
+      .eq("lida", false);
 
-    const totalLiberado = (pagamentos || []).reduce(
-      (acc: number, item: any) => acc + Number(item.valor_freelancer || 0),
-      0
-    );
-
-    const totalSacado = (saques || [])
-      .filter((s: any) => s.status === "solicitado" || s.status === "pago")
-      .reduce((acc: number, item: any) => acc + Number(item.valor || 0), 0);
-
-    setSaldoDisponivel(totalLiberado - totalSacado);
+    await carregarNotificacoes(usuario.id);
   }
 
   function sair() {
     localStorage.removeItem("freelabrasil_usuario");
-    setUsuario(null);
     window.location.href = "/";
   }
 
-  function painelUsuario() {
-    if (usuario?.tipo_usuario === "freelancer") return "/painel-freelancer";
-    if (usuario?.tipo_usuario === "contratante") return "/painel-contratante";
-    return "/";
-  }
-
-  function badgePlano(plano?: string) {
-    if (plano === "pro") return "👑 PRO";
-    if (plano === "plus") return "💎 PLUS";
-    return "GRATUITO";
-  }
-
-  function iniciais(nome?: string) {
-    if (!nome) return "U";
-
-    return nome
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  }
-
-  function formatar(valor: number) {
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-  }
+  const naoLidas = notificacoes.filter((n) => !n.lida).length;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-slate-950/95 backdrop-blur text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="text-2xl font-black tracking-tight">
-            Freella<span className="text-emerald-400">Brasil</span>
+        <Link href="/" className="flex items-center gap-3">
+          <img
+            src="/logo-freellabrasil.png"
+            alt="FreellaBrasil"
+            className="h-8 md:h-10"
+          />
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+          <Link href="/projetos" className="hover:text-emerald-400">
+            Buscar projetos
           </Link>
 
-          <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-            <Link href="/projetos" className="hover:text-emerald-400">
-              Buscar projetos
-            </Link>
+          <Link href="/freelancers" className="hover:text-emerald-400">
+            Freelancers
+          </Link>
 
-            <Link href="/freelancers" className="hover:text-emerald-400">
-              Freelancers
-            </Link>
-
-            {usuario?.tipo_usuario === "freelancer" && (
-              <>
-                <Link href="/meus-trabalhos" className="hover:text-emerald-400">
-                  Meus Trabalhos
-                </Link>
-
-                <Link href="/saques" className="hover:text-emerald-400">
-                  Saques
-                </Link>
-              </>
-            )}
-
-            {usuario?.tipo_usuario === "contratante" && (
-              <>
-                <Link href="/meus-projetos" className="hover:text-emerald-400">
-                  Meus Projetos
-                </Link>
-
-                <Link href="/projetos/novo" className="hover:text-emerald-400">
-                  Criar Projeto
-                </Link>
-              </>
-            )}
-
-            {usuario && (
-              <Link
-                href="/dashboard-financeiro"
-                className="hover:text-yellow-400"
-              >
-                Financeiro
-              </Link>
-            )}
-
-            <Link href="/planos" className="hover:text-purple-400">
-              Planos
-            </Link>
-          </nav>
-        </div>
+          <Link href="/planos" className="hover:text-purple-400">
+            Planos
+          </Link>
+        </nav>
 
         {!usuario ? (
           <div className="flex items-center gap-3">
@@ -171,92 +133,135 @@ export default function Navbar() {
           </div>
         ) : (
           <div className="relative flex items-center gap-4">
-            {usuario.tipo_usuario === "freelancer" && (
-              <Link
-                href="/saques"
-                className="hidden rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300 hover:bg-emerald-400/20 md:block"
+            {/* SINO */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setNotificacoesAberto(!notificacoesAberto);
+                  setMenuAberto(false);
+                }}
+                className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl hover:bg-white/10"
+                title="Notificações"
               >
-                Saldo {formatar(saldoDisponivel)}
-              </Link>
-            )}
+                🔔
 
-            <Link
-              href="/notificacoes"
-              className="hidden rounded-xl border border-white/10 px-4 py-2 text-sm font-bold hover:bg-white/5 md:block"
-            >
-              🔔
-            </Link>
+                {naoLidas > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-black text-white">
+                    {naoLidas > 9 ? "9+" : naoLidas}
+                  </span>
+                )}
+              </button>
 
+              {notificacoesAberto && (
+                <div className="absolute right-0 top-14 w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-white/10 p-4">
+                    <div>
+                      <h3 className="font-black">Notificações</h3>
+                      <p className="text-xs text-slate-400">
+                        {naoLidas} não lida{naoLidas !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+
+                    {naoLidas > 0 && (
+                      <button
+                        onClick={marcarTodasComoLidas}
+                        className="text-xs font-bold text-emerald-300 hover:underline"
+                      >
+                        Marcar todas
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[420px] overflow-y-auto">
+                    {notificacoes.length === 0 && (
+                      <div className="p-5 text-sm text-slate-400">
+                        Nenhuma notificação ainda.
+                      </div>
+                    )}
+
+                    {notificacoes.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => marcarComoLida(n.id, n.link)}
+                        className={`block w-full border-b border-white/5 p-4 text-left hover:bg-white/5 ${
+                          !n.lida ? "bg-emerald-400/5" : ""
+                        }`}
+                      >
+                        <div className="flex gap-3">
+                          <span
+                            className={`mt-1 h-2 w-2 rounded-full ${
+                              !n.lida ? "bg-emerald-400" : "bg-slate-600"
+                            }`}
+                          />
+
+                          <div>
+                            <p className="font-bold text-white">
+                              {n.titulo || "Notificação"}
+                            </p>
+
+                            <p className="mt-1 text-sm leading-6 text-slate-400">
+                              {n.descricao || ""}
+                            </p>
+
+                            {n.created_at && (
+                              <p className="mt-2 text-xs text-slate-500">
+                                {new Date(n.created_at).toLocaleString("pt-BR")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <Link
+                    href="/notificacoes"
+                    className="block border-t border-white/10 p-4 text-center text-sm font-bold text-emerald-300 hover:bg-white/5"
+                  >
+                    Ver todas
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* MENU USUÁRIO */}
             <button
-              onClick={() => setMenuAberto(!menuAberto)}
+              onClick={() => {
+                setMenuAberto(!menuAberto);
+                setNotificacoesAberto(false);
+              }}
               className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
             >
-              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-emerald-400 text-sm font-black text-slate-950">
-                {usuario.foto_url ? (
-                  <img
-                    src={usuario.foto_url}
-                    alt={usuario.nome}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  iniciais(usuario.nome)
-                )}
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-sm font-black text-slate-950">
+                {usuario.nome?.charAt(0)?.toUpperCase()}
               </div>
 
-              <div className="hidden text-left md:block">
-                <p className="text-sm font-bold leading-4">{usuario.nome}</p>
-                <p className="text-xs text-slate-400">
-                  {badgePlano(usuario.plano)}
-                </p>
-              </div>
-
-              <span className="text-slate-400">▾</span>
+              <span className="hidden md:block text-sm font-bold">
+                {usuario.nome}
+              </span>
             </button>
 
             {menuAberto && (
-              <div className="absolute right-0 top-14 w-80 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
-                <div className="border-b border-white/10 p-4">
-                  <p className="font-black">{usuario.nome}</p>
-                  <p className="text-sm text-slate-400">{usuario.email}</p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <p className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                      {badgePlano(usuario.plano)}
-                    </p>
-
-                    {usuario.tipo_usuario === "freelancer" && (
-                      <p className="inline-block rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
-                        Saldo {formatar(saldoDisponivel)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
+              <div className="absolute right-0 top-14 w-64 rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
                 <div className="flex flex-col p-2 text-sm">
-                  <Link
-                    href={painelUsuario()}
-                    onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-white/5"
-                  >
-                    Painel
+                  <Link href="/perfil" className="px-4 py-3 hover:bg-white/5">
+                    Meu Perfil
                   </Link>
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <>
                       <Link
-                        href="/meus-trabalhos"
-                        onClick={() => setMenuAberto(false)}
-                        className="rounded-xl px-4 py-3 hover:bg-white/5"
+                        href="/convites"
+                        className="px-4 py-3 hover:bg-white/5"
                       >
-                        Meus Trabalhos
+                        Meus convites
                       </Link>
 
                       <Link
                         href="/saques"
-                        onClick={() => setMenuAberto(false)}
-                        className="rounded-xl px-4 py-3 text-emerald-300 hover:bg-emerald-400/10"
+                        className="px-4 py-3 hover:bg-white/5"
                       >
-                        Saques / Saldo
+                        Saques
                       </Link>
                     </>
                   )}
@@ -264,48 +269,49 @@ export default function Navbar() {
                   {usuario.tipo_usuario === "contratante" && (
                     <Link
                       href="/meus-projetos"
-                      onClick={() => setMenuAberto(false)}
-                      className="rounded-xl px-4 py-3 hover:bg-white/5"
+                      className="px-4 py-3 hover:bg-white/5"
                     >
-                      Meus Projetos
+                      Meus projetos
                     </Link>
                   )}
 
                   <Link
                     href="/dashboard-financeiro"
-                    onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-white/5"
+                    className="px-4 py-3 hover:bg-white/5"
                   >
                     Financeiro
                   </Link>
 
-                  <Link
-                    href="/notificacoes"
-                    onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-white/5"
-                  >
-                    Notificações
-                  </Link>
+                  {usuario.role === "admin" && (
+                    <>
+                      <div className="my-2 border-t border-white/10" />
 
-                  <Link
-                    href="/perfil"
-                    onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-white/5"
-                  >
-                    Meu Perfil
-                  </Link>
+                      <Link
+                        href="/admin"
+                        className="px-4 py-3 font-bold text-emerald-300 hover:bg-white/5"
+                      >
+                        Admin
+                      </Link>
 
-                  <Link
-                    href="/planos"
-                    onClick={() => setMenuAberto(false)}
-                    className="rounded-xl px-4 py-3 text-purple-300 hover:bg-purple-500/10"
-                  >
-                    Alterar Plano
-                  </Link>
+                      <Link
+                        href="/admin/denuncias"
+                        className="px-4 py-3 hover:bg-white/5"
+                      >
+                        Denúncias
+                      </Link>
+
+                      <Link
+                        href="/admin/saques"
+                        className="px-4 py-3 hover:bg-white/5"
+                      >
+                        Saques admin
+                      </Link>
+                    </>
+                  )}
 
                   <button
                     onClick={sair}
-                    className="mt-2 rounded-xl px-4 py-3 text-left font-bold text-red-300 hover:bg-red-500/10"
+                    className="mt-2 px-4 py-3 text-left text-red-300 hover:bg-red-500/10"
                   >
                     Sair
                   </button>
