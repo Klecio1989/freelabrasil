@@ -1,9 +1,10 @@
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export const metadata = {
   title: "FreellaBrasil",
-  description: "Plataforma de freelancers",
+  description: "Conecta talentos, realiza projetos.",
 };
 
 export default function RootLayout({
@@ -16,6 +17,7 @@ export default function RootLayout({
       <body className="bg-slate-950">
         <Navbar />
         {children}
+        <Footer />
       </body>
     </html>
   );
