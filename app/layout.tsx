@@ -77,7 +77,7 @@ export default function RootLayout({
         <Clarity />
         <Navbar />
         {children}
-        <Footer />
+         <Footer />
       </body>
     </html>
   );

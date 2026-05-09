@@ -1,19 +1,31 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "OPENAI_API_KEY não configurada.",
+        },
+        { status: 500 }
+      );
+    }
 
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const body = await req.json();
     const { titulo, descricao, area, prazo } = body;
 
     if (!titulo || !descricao) {
       return NextResponse.json(
-        { error: "Título e descrição são obrigatórios." },
+        {
+          success: false,
+          error: "Título e descrição são obrigatórios.",
+        },
         { status: 400 }
       );
     }
@@ -62,12 +74,22 @@ Retorne APENAS JSON válido neste formato:
       success: true,
       resultado,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro IA preço:", error);
 
     return NextResponse.json(
-      { error: "Erro ao sugerir preço com IA." },
+      {
+        success: false,
+        error: error?.message || "Erro ao sugerir preço com IA.",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: "API sugerir preço ativa.",
+  });
 }
