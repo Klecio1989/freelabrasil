@@ -2,6 +2,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import Clarity from "@/components/Clarity";
 
 
 export const metadata = {
@@ -17,7 +18,8 @@ export default function RootLayout({
     <html lang="pt-BR">
       <Navbar />
       <Footer />
-      <GoogleAnalytics />      
+      <GoogleAnalytics />
+      <Clarity />          
       <body>{children}</body>
     </html>
   );
