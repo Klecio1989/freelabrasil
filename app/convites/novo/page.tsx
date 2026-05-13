@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { enviarEmail } from "@/lib/enviarEmail";
 
 export default function NovoConvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 p-10 text-white">
+          Carregando convite...
+        </main>
+      }
+    >
+      <NovoConviteContent />
+    </Suspense>
+  );
+}
+
+function NovoConviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const freelaId = searchParams.get("freela_id");
@@ -191,7 +205,8 @@ export default function NovoConvitePage() {
           <h1 className="text-4xl font-black">Convidar freelancer</h1>
 
           <p className="mt-3 text-slate-400">
-            Você está convidando <strong className="text-white">{freela.nome}</strong>.
+            Você está convidando{" "}
+            <strong className="text-white">{freela.nome}</strong>.
           </p>
 
           <div className="mt-8">
