@@ -38,7 +38,6 @@ export default function ConvitesPage() {
     }
 
     const parsed = JSON.parse(usuarioSalvo);
-
     setUsuario(parsed);
 
     const { data, error } = await supabase
@@ -120,23 +119,21 @@ export default function ConvitesPage() {
         propostaId = propostaExistente?.id;
 
         if (!propostaId) {
-          const { data: novaProposta, error: erroProposta } =
-            await supabase
-              .from("propostas")
-              .insert([
-                {
-                  freelancer_id: convite.freelancer_id,
-                  projeto_id: convite.projeto_id,
-                  valor: 0,
-                  prazo: 0,
-                  mensagem:
-                    convite.mensagem ||
-                    "Convite aceito pelo freelancer.",
-                  status: "aceita",
-                },
-              ])
-              .select("id")
-              .single();
+          const { data: novaProposta, error: erroProposta } = await supabase
+            .from("propostas")
+            .insert([
+              {
+                freelancer_id: convite.freelancer_id,
+                projeto_id: convite.projeto_id,
+                valor: 0,
+                prazo: 0,
+                mensagem:
+                  convite.mensagem || "Convite aceito pelo freelancer.",
+                status: "aceita",
+              },
+            ])
+            .select("id")
+            .single();
 
           if (erroProposta) {
             alert(erroProposta.message);
@@ -169,8 +166,30 @@ export default function ConvitesPage() {
           ]);
 
         if (erroAndamento) {
-          console.error(erroAndamento);
-          alert("Erro ao iniciar projeto.");
+          alert("Erro ao iniciar projeto: " + erroAndamento.message);
+          return;
+        }
+      }
+
+      const { data: chatExistente } = await supabase
+        .from("chats")
+        .select("id")
+        .eq("projeto_id", convite.projeto_id)
+        .eq("freela_id", convite.freelancer_id)
+        .eq("contratante_id", convite.contratante_id)
+        .maybeSingle();
+
+      if (!chatExistente) {
+        const { error: erroChat } = await supabase.from("chats").insert([
+          {
+            projeto_id: convite.projeto_id,
+            freela_id: convite.freelancer_id,
+            contratante_id: convite.contratante_id,
+          },
+        ]);
+
+        if (erroChat) {
+          alert("Erro ao criar chat: " + erroChat.message);
           return;
         }
       }
@@ -210,7 +229,7 @@ export default function ConvitesPage() {
         )
       );
 
-      alert("Convite aceito com sucesso!");
+      alert("Convite aceito com sucesso! Chat liberado.");
     } catch (error) {
       console.error(error);
       alert("Erro ao aceitar convite.");
@@ -240,9 +259,7 @@ export default function ConvitesPage() {
 
     setConvites((prev) =>
       prev.map((c) =>
-        c.id === convite.id
-          ? { ...c, status: "recusado" }
-          : c
+        c.id === convite.id ? { ...c, status: "recusado" } : c
       )
     );
   }
@@ -271,9 +288,7 @@ export default function ConvitesPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
       <div className="mx-auto max-w-6xl">
-
         <div className="mb-10 flex items-center justify-between gap-4 flex-wrap">
-
           <div>
             <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
               Área do freelancer
@@ -289,7 +304,6 @@ export default function ConvitesPage() {
           </div>
 
           <div className="flex gap-3">
-
             <button
               onClick={carregarConvites}
               className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
@@ -303,7 +317,6 @@ export default function ConvitesPage() {
             >
               Voltar
             </Link>
-
           </div>
         </div>
 
@@ -320,24 +333,18 @@ export default function ConvitesPage() {
         )}
 
         <div className="grid gap-6">
-
           {!carregando &&
             convites.map((convite) => (
               <div
                 key={convite.id}
                 className="rounded-[2rem] border border-white/10 bg-white/5 p-7 shadow-2xl"
               >
-
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-
                   <div>
-
                     <div className="mb-4 flex flex-wrap gap-3">
-
                       <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
                         {(convite.status || "pendente").toUpperCase()}
                       </span>
-
                     </div>
 
                     <h2 className="text-3xl font-black">
@@ -351,13 +358,10 @@ export default function ConvitesPage() {
                     <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
                       {convite.mensagem || "Sem mensagem."}
                     </p>
-
                   </div>
 
                   <div className="flex min-w-[230px] flex-col gap-3">
-
-                    {(!convite.status ||
-                      convite.status === "pendente") && (
+                    {(!convite.status || convite.status === "pendente") && (
                       <>
                         <button
                           onClick={() => aceitarConvite(convite)}
@@ -375,15 +379,14 @@ export default function ConvitesPage() {
                       </>
                     )}
 
-                    {convite.status === "aceito" &&
-                      convite.proposta_id && (
-                        <Link
-                          href={`/chat?proposta_id=${convite.proposta_id}`}
-                          className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
-                        >
-                          Abrir chat
-                        </Link>
-                      )}
+                    {convite.status === "aceito" && convite.proposta_id && (
+                      <Link
+                        href={`/chat?proposta_id=${convite.proposta_id}`}
+                        className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
+                      >
+                        Abrir chat
+                      </Link>
+                    )}
 
                     <Link
                       href={`/projetos/${convite.projeto_id}`}
@@ -391,7 +394,6 @@ export default function ConvitesPage() {
                     >
                       Ver projeto convidado
                     </Link>
-
                   </div>
                 </div>
               </div>
