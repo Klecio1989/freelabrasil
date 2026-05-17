@@ -7,7 +7,10 @@ import AvaliacaoModal from "@/components/AvaliacaoModal";
 
 export default function MeusProjetosPage() {
   const [usuario, setUsuario] = useState<any>(null);
+
+  const [projetosPublicados, setProjetosPublicados] = useState<any[]>([]);
   const [projetos, setProjetos] = useState<any[]>([]);
+
   const [pagamentosMap, setPagamentosMap] = useState<Record<string, any>>({});
   const [avaliar, setAvaliar] = useState<any>(null);
   const [avaliacoesFeitas, setAvaliacoesFeitas] = useState<string[]>([]);
@@ -27,12 +30,31 @@ export default function MeusProjetosPage() {
     }
 
     const parsed = JSON.parse(usuarioSalvo);
+
     setUsuario(parsed);
 
-    await carregarProjetos(parsed.id);
-    await carregarAvaliacoesFeitas(parsed.id);
+    await Promise.all([
+      carregarProjetosPublicados(parsed.id),
+      carregarProjetos(parsed.id),
+      carregarAvaliacoesFeitas(parsed.id),
+    ]);
 
     setLoading(false);
+  }
+
+  async function carregarProjetosPublicados(contratanteId: string) {
+    const { data, error } = await supabase
+      .from("projetos")
+      .select("*")
+      .eq("contratante_id", contratanteId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setProjetosPublicados(data || []);
   }
 
   async function carregarProjetos(contratanteId: string) {
@@ -58,6 +80,7 @@ export default function MeusProjetosPage() {
     }
 
     const lista = data || [];
+
     setProjetos(lista);
 
     const projetoIds = lista.map((p: any) => p.projeto_id).filter(Boolean);
@@ -73,8 +96,6 @@ export default function MeusProjetosPage() {
       );
 
       setPagamentosMap(mapa);
-    } else {
-      setPagamentosMap({});
     }
   }
 
@@ -91,6 +112,7 @@ export default function MeusProjetosPage() {
 
   function valorProjeto(item: any) {
     const bruto = item.projetos?.orcamento || "0";
+
     const limpo = String(bruto)
       .replace("R$", "")
       .replace(/\./g, "")
@@ -98,6 +120,7 @@ export default function MeusProjetosPage() {
       .trim();
 
     const numero = Number(limpo);
+
     return isNaN(numero) ? 0 : numero;
   }
 
@@ -108,7 +131,7 @@ export default function MeusProjetosPage() {
       const valor = valorProjeto(item);
 
       if (valor <= 0) {
-        alert("O projeto precisa ter um valor válido para pagamento.");
+        alert("O projeto precisa ter um valor válido.");
         return;
       }
 
@@ -130,7 +153,6 @@ export default function MeusProjetosPage() {
           .single();
 
         if (error || !data) {
-          console.error(error);
           alert("Erro ao criar pagamento.");
           return;
         }
@@ -156,8 +178,7 @@ export default function MeusProjetosPage() {
       const data = await res.json();
 
       if (!data.url) {
-        console.error(data);
-        alert("Erro ao gerar pagamento no Mercado Pago.");
+        alert("Erro ao gerar pagamento.");
         return;
       }
 
@@ -181,15 +202,8 @@ export default function MeusProjetosPage() {
   }
 
   async function confirmarEntrega(item: any) {
-    if (!pagamentoAprovado(item)) {
-      alert(
-        "Para confirmar a entrega, o pagamento precisa estar aprovado e retido na plataforma."
-      );
-      return;
-    }
-
     const confirmar = confirm(
-      "Confirma que o projeto foi entregue corretamente? Após confirmar, você deverá avaliar o freelancer para liberar o pagamento."
+      "Confirma que o projeto foi entregue corretamente?"
     );
 
     if (!confirmar) return;
@@ -203,7 +217,6 @@ export default function MeusProjetosPage() {
       .eq("id", item.id);
 
     if (error) {
-      console.error(error);
       alert("Erro ao confirmar entrega.");
       return;
     }
@@ -217,30 +230,13 @@ export default function MeusProjetosPage() {
   }
 
   async function liberarPagamento(item: any) {
-    const { error } = await supabase
+    await supabase
       .from("pagamentos")
       .update({
         status: "liberado",
         liberado_at: new Date().toISOString(),
       })
       .eq("projeto_id", item.projeto_id);
-
-    if (error) {
-      console.error("Erro ao liberar pagamento:", error);
-      alert("Avaliação salva, porém houve erro ao liberar pagamento.");
-      return false;
-    }
-
-    await supabase.from("notificacoes").insert([
-      {
-        usuario_id: item.freela_id,
-        titulo: "Pagamento liberado",
-        descricao:
-          "O contratante confirmou a entrega, avaliou seu trabalho e o pagamento foi liberado para saque.",
-        lida: false,
-        link: "/saques",
-      },
-    ]);
 
     return true;
   }
@@ -252,40 +248,9 @@ export default function MeusProjetosPage() {
   function traduzirStatus(status: string) {
     if (status === "em_andamento") return "Em andamento";
     if (status === "finalizado_freela") return "Aguardando confirmação";
-    if (status === "finalizacao_solicitada") return "Aguardando confirmação";
     if (status === "concluido") return "Concluído";
+
     return status || "-";
-  }
-
-  function traduzirPagamento(item: any) {
-    const pagamento = pagamentosMap[item.projeto_id];
-
-    if (!pagamento) return "Não iniciado";
-    if (pagamento.status === "aguardando_pagamento") return "Aguardando pagamento";
-    if (pagamento.status === "retido") return "Pago e retido";
-    if (pagamento.status === "liberado") return "Liberado para saque";
-    if (pagamento.status === "pago") return "Pago ao freelancer";
-    if (pagamento.status === "cancelado") return "Cancelado";
-
-    return pagamento.status;
-  }
-
-  function corPagamento(item: any) {
-    const pagamento = pagamentosMap[item.projeto_id];
-
-    if (!pagamento || pagamento.status === "aguardando_pagamento") {
-      return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
-    }
-
-    if (
-      pagamento.status === "retido" ||
-      pagamento.status === "liberado" ||
-      pagamento.status === "pago"
-    ) {
-      return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
-    }
-
-    return "text-red-300 bg-red-400/10 border-red-400/20";
   }
 
   if (loading) {
@@ -296,152 +261,178 @@ export default function MeusProjetosPage() {
     );
   }
 
-  if (!usuario) {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Você precisa estar logado.
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <section className="mx-auto max-w-7xl">
+
         <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-black">Meus Projetos</h1>
+
             <p className="mt-3 text-slate-400">
-              Pague, acompanhe entregas, avalie freelancers e libere pagamentos.
+              Gerencie seus projetos publicados e em andamento.
             </p>
           </div>
 
-          <Link
-            href="/painel-contratante"
-            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
-          >
-            Voltar
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              href="/projetos/novo"
+              className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
+            >
+              Novo Projeto
+            </Link>
+
+            <Link
+              href="/painel-contratante"
+              className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+            >
+              Voltar
+            </Link>
+          </div>
         </div>
 
-        {projetos.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            Você ainda não possui projetos em execução.
-          </div>
-        )}
+        {/* PROJETOS PUBLICADOS */}
 
-        <div className="grid gap-6">
-          {projetos.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black">
-                    {item.projetos?.titulo || "Projeto sem título"}
-                  </h2>
+        <div className="mb-12">
+          <h2 className="mb-5 text-3xl font-black">
+            Projetos Publicados
+          </h2>
 
-                  <p className="mt-3 max-w-4xl leading-7 text-slate-300">
-                    {item.projetos?.descricao || "Sem descrição."}
-                  </p>
+          {projetosPublicados.length === 0 && (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+              Você ainda não publicou projetos.
+            </div>
+          )}
+
+          <div className="grid gap-6">
+            {projetosPublicados.map((projeto) => (
+              <div
+                key={projeto.id}
+                className="rounded-3xl border border-white/10 bg-slate-900 p-6"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+
+                  <div>
+                    <h3 className="text-2xl font-black">
+                      {projeto.titulo}
+                    </h3>
+
+                    <p className="mt-3 max-w-4xl leading-7 text-slate-300">
+                      {projeto.descricao}
+                    </p>
+                  </div>
+
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300">
+                    Publicado
+                  </span>
+
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="mt-6 flex flex-wrap gap-4">
+
+                  <Link
+                    href={`/projetos/${projeto.id}`}
+                    className="rounded-xl border border-white/20 px-5 py-3"
+                  >
+                    Abrir projeto
+                  </Link>
+
+                  <Link
+                    href="/propostas-recebidas"
+                    className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+                  >
+                    Ver propostas
+                  </Link>
+
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* PROJETOS EM EXECUÇÃO */}
+
+        <div>
+          <h2 className="mb-5 text-3xl font-black">
+            Projetos em Execução
+          </h2>
+
+          {projetos.length === 0 && (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+              Nenhum projeto em execução.
+            </div>
+          )}
+
+          <div className="grid gap-6">
+            {projetos.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-3xl border border-white/10 bg-slate-900 p-6"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+
+                  <div>
+                    <h2 className="text-2xl font-black">
+                      {item.projetos?.titulo}
+                    </h2>
+
+                    <p className="mt-3 max-w-4xl leading-7 text-slate-300">
+                      {item.projetos?.descricao}
+                    </p>
+                  </div>
+
                   <span className="rounded-full border border-blue-400/20 bg-blue-400/10 px-4 py-2 text-sm font-bold text-blue-300">
                     {traduzirStatus(item.status)}
                   </span>
 
-                  <span
-                    className={`rounded-full border px-4 py-2 text-sm font-bold ${corPagamento(
-                      item
-                    )}`}
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-4">
+
+                  <Link
+                    href={`/chat?proposta_id=${item.proposta_id}`}
+                    className="rounded-xl border border-white/20 px-5 py-3"
                   >
-                    {traduzirPagamento(item)}
-                  </span>
+                    Abrir chat
+                  </Link>
+
+                  {item.status === "em_andamento" &&
+                    !pagamentoAprovado(item) && (
+                      <button
+                        onClick={() => pagarProjeto(item)}
+                        disabled={pagandoId === item.id}
+                        className="rounded-xl bg-yellow-400 px-6 py-3 font-black text-black"
+                      >
+                        {pagandoId === item.id
+                          ? "Redirecionando..."
+                          : "Pagar projeto"}
+                      </button>
+                    )}
+
+                  {(item.status === "finalizado_freela" ||
+                    item.status === "finalizacao_solicitada") && (
+                      <button
+                        onClick={() => confirmarEntrega(item)}
+                        className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
+                      >
+                        Confirmar entrega
+                      </button>
+                    )}
+
+                  {item.status === "concluido" &&
+                    !jaAvaliado(item) && (
+                      <button
+                        onClick={() => setAvaliar(item)}
+                        className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-slate-950"
+                      >
+                        Avaliar freelancer
+                      </button>
+                    )}
+
                 </div>
               </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-4">
-                <Info
-                  titulo="Valor"
-                  valor={valorProjeto(item).toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  })}
-                />
-
-                <Info titulo="Prazo" valor={String(item.projetos?.prazo || "-")} />
-
-                <Info
-                  titulo="Categoria"
-                  valor={item.projetos?.categoria || item.projetos?.area || "-"}
-                />
-
-                <Info
-                  titulo="Início"
-                  valor={
-                    item.data_inicio
-                      ? new Date(item.data_inicio).toLocaleDateString("pt-BR")
-                      : "-"
-                  }
-                />
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-4">
-                {item.status === "em_andamento" && !pagamentoAprovado(item) && (
-                  <button
-                    onClick={() => pagarProjeto(item)}
-                    disabled={pagandoId === item.id}
-                    className="rounded-xl bg-yellow-400 px-6 py-3 font-black text-black disabled:opacity-60"
-                  >
-                    {pagandoId === item.id
-                      ? "Redirecionando..."
-                      : "Pagar projeto"}
-                  </button>
-                )}
-
-                {item.status === "em_andamento" && pagamentoAprovado(item) && (
-                  <p className="font-bold text-emerald-300">
-                    Pagamento aprovado e retido. Aguarde a entrega do freelancer.
-                  </p>
-                )}
-
-                {(item.status === "finalizacao_solicitada" ||
-                  item.status === "finalizado_freela") && (
-                  <button
-                    onClick={() => confirmarEntrega(item)}
-                    className="rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
-                  >
-                    Confirmar entrega e avaliar
-                  </button>
-                )}
-
-                {item.status === "concluido" && !jaAvaliado(item) && (
-                  <button
-                    onClick={() => {
-                      if (!pagamentoAprovado(item)) {
-                        alert(
-                          "O pagamento precisa estar aprovado antes de liberar o freelancer."
-                        );
-                        return;
-                      }
-
-                      setAvaliar(item);
-                    }}
-                    className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-slate-950"
-                  >
-                    Avaliar freelancer e liberar pagamento
-                  </button>
-                )}
-
-                {item.status === "concluido" && jaAvaliado(item) && (
-                  <p className="font-bold text-emerald-300">
-                    Projeto concluído, avaliado e pagamento liberado.
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {avaliar && (
@@ -450,29 +441,18 @@ export default function MeusProjetosPage() {
             usuario={usuario}
             onClose={() => setAvaliar(null)}
             onSuccess={async () => {
-              const liberado = await liberarPagamento(avaliar);
+              await liberarPagamento(avaliar);
 
               await carregarProjetos(usuario.id);
               await carregarAvaliacoesFeitas(usuario.id);
 
               setAvaliar(null);
 
-              if (liberado) {
-                alert("Avaliação enviada e pagamento liberado com sucesso!");
-              }
+              alert("Pagamento liberado com sucesso!");
             }}
           />
         )}
       </section>
     </main>
-  );
-}
-
-function Info({ titulo, valor }: { titulo: string; valor: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <p className="text-sm text-slate-400">{titulo}</p>
-      <p className="mt-1 font-bold text-white">{valor}</p>
-    </div>
   );
 }
