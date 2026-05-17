@@ -1,271 +1,286 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 
-export default function ChatPage() {
-  return (
-    <Suspense fallback={<Loading />}>
-      <ChatContent />
-    </Suspense>
-  );
-}
+type Convite = {
+  id: string;
+  contratante_id: string;
+  freelancer_id: string;
+  projeto_id: string;
+  mensagem: string;
+  status?: string;
+  proposta_id?: string;
+  created_at?: string;
+  projeto_titulo?: string;
+  contratante_nome?: string;
+};
 
-function Loading() {
-  return (
-    <main className="min-h-screen bg-slate-950 p-10 text-white">
-      Carregando chat...
-    </main>
-  );
-}
-
-function ChatContent() {
-  const searchParams = useSearchParams();
-  const propostaId = searchParams.get("proposta_id");
-
+export default function ConvitesPage() {
+  const [convites, setConvites] = useState<Convite[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [mensagens, setMensagens] = useState<any[]>([]);
-  const [mensagem, setMensagem] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [enviando, setEnviando] = useState(false);
-
-  const mensagensRef = useRef<HTMLDivElement>(null);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    carregar();
+    carregarConvites();
   }, []);
 
-  useEffect(() => {
-    mensagensRef.current?.scrollTo({
-      top: mensagensRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [mensagens]);
+  async function carregarConvites() {
+    setCarregando(true);
 
-  async function carregar() {
-    setLoading(true);
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
-    const userLocal = localStorage.getItem("freelabrasil_usuario");
-
-    if (!userLocal) {
-      setLoading(false);
+    if (!usuarioSalvo) {
+      setUsuario(null);
+      setCarregando(false);
       return;
     }
 
-    const parsed = JSON.parse(userLocal);
+    const parsed = JSON.parse(usuarioSalvo);
     setUsuario(parsed);
 
-    if (!propostaId) {
-      setLoading(false);
+    const { data, error } = await supabase
+      .from("convites")
+      .select("*")
+      .eq("freelancer_id", parsed.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      setCarregando(false);
       return;
     }
 
-    const { data: proposta, error: erroProposta } = await supabase
-      .from("propostas")
-      .select("id, projeto_id, freelancer_id")
-      .eq("id", propostaId)
-      .maybeSingle();
+    const lista = data || [];
 
-    if (erroProposta || !proposta) {
-      console.error(erroProposta);
-      setLoading(false);
-      return;
+    const projetoIds = [
+      ...new Set(lista.map((c: any) => c.projeto_id).filter(Boolean)),
+    ];
+
+    const contratanteIds = [
+      ...new Set(lista.map((c: any) => c.contratante_id).filter(Boolean)),
+    ];
+
+    let projetosMap: Record<string, any> = {};
+    let contratantesMap: Record<string, any> = {};
+
+    if (projetoIds.length > 0) {
+      const { data: projetosData } = await supabase
+        .from("projetos")
+        .select("id,titulo")
+        .in("id", projetoIds);
+
+      projetosMap = Object.fromEntries(
+        projetosData?.map((p: any) => [p.id, p]) || []
+      );
     }
 
-    const { data: projeto } = await supabase
-      .from("projetos")
-      .select("id, contratante_id")
-      .eq("id", proposta.projeto_id)
-      .maybeSingle();
+    if (contratanteIds.length > 0) {
+      const { data: usuariosData } = await supabase
+        .from("usuarios")
+        .select("id,nome")
+        .in("id", contratanteIds);
 
-    let contratanteId = projeto?.contratante_id;
+      contratantesMap = Object.fromEntries(
+        usuariosData?.map((u: any) => [u.id, u]) || []
+      );
+    }
 
-    if (!contratanteId) {
-      const { data: andamento } = await supabase
+    const convitesFormatados = lista.map((c: any) => ({
+      ...c,
+      projeto_titulo: projetosMap[c.projeto_id]?.titulo || "Projeto",
+      contratante_nome:
+        contratantesMap[c.contratante_id]?.nome || "Contratante",
+    }));
+
+    setConvites(convitesFormatados);
+    setCarregando(false);
+  }
+
+  async function aceitarConvite(convite: Convite) {
+    if (!usuario) return;
+
+    try {
+      let propostaId = convite.proposta_id;
+
+      if (!propostaId) {
+        const { data: propostaExistente } = await supabase
+          .from("propostas")
+          .select("id")
+          .eq("freelancer_id", convite.freelancer_id)
+          .eq("projeto_id", convite.projeto_id)
+          .maybeSingle();
+
+        propostaId = propostaExistente?.id;
+
+        if (!propostaId) {
+          const { data: novaProposta, error: erroProposta } = await supabase
+            .from("propostas")
+            .insert([
+              {
+                freelancer_id: convite.freelancer_id,
+                projeto_id: convite.projeto_id,
+                valor: 0,
+                prazo: 0,
+                mensagem:
+                  convite.mensagem || "Convite aceito pelo freelancer.",
+                status: "aceita",
+              },
+            ])
+            .select("id")
+            .single();
+
+          if (erroProposta) {
+            alert(erroProposta.message);
+            return;
+          }
+
+          propostaId = novaProposta.id;
+        }
+      }
+
+      const { data: andamentoExistente } = await supabase
         .from("projetos_andamento")
-        .select("contratante_id")
-        .eq("projeto_id", proposta.projeto_id)
+        .select("id")
+        .eq("projeto_id", convite.projeto_id)
+        .eq("freela_id", convite.freelancer_id)
         .maybeSingle();
 
-      contratanteId = andamento?.contratante_id;
-    }
+      if (!andamentoExistente) {
+        const { error: erroAndamento } = await supabase
+          .from("projetos_andamento")
+          .insert([
+            {
+              projeto_id: convite.projeto_id,
+              freela_id: convite.freelancer_id,
+              contratante_id: convite.contratante_id,
+              proposta_id: propostaId,
+              status: "em_andamento",
+              data_inicio: new Date().toISOString(),
+            },
+          ]);
 
-    if (!contratanteId) {
-      alert("Contratante não localizado para este projeto.");
-      setLoading(false);
-      return;
-    }
+        if (erroAndamento) {
+          alert("Erro ao iniciar projeto: " + erroAndamento.message);
+          return;
+        }
+      }
 
-    const { data: chatExistente } = await supabase
-      .from("chats")
-      .select("id")
-      .eq("projeto_id", proposta.projeto_id)
-      .eq("freela_id", proposta.freelancer_id)
-      .eq("contratante_id", contratanteId)
-      .maybeSingle();
-
-    let novoChatId = chatExistente?.id;
-
-    if (!novoChatId) {
-      const { data: novoChat, error: erroChat } = await supabase
+      const { data: chatExistente } = await supabase
         .from("chats")
-        .insert([
-          {
-            projeto_id: proposta.projeto_id,
-            freela_id: proposta.freelancer_id,
-            contratante_id: contratanteId,
-          },
-        ])
         .select("id")
-        .single();
+        .eq("projeto_id", convite.projeto_id)
+        .eq("freela_id", convite.freelancer_id)
+        .eq("contratante_id", convite.contratante_id)
+        .maybeSingle();
 
-      if (erroChat) {
-        console.error(erroChat);
-        alert("Erro ao criar chat: " + erroChat.message);
-        setLoading(false);
+      if (!chatExistente) {
+        const { error: erroChat } = await supabase.from("chats").insert([
+          {
+            projeto_id: convite.projeto_id,
+            freela_id: convite.freelancer_id,
+            contratante_id: convite.contratante_id,
+            proposta_id: propostaId,
+          },
+        ]);
+
+        if (erroChat) {
+          alert("Erro ao criar chat: " + erroChat.message);
+          return;
+        }
+      } else {
+        await supabase
+          .from("chats")
+          .update({ proposta_id: propostaId })
+          .eq("id", chatExistente.id);
+      }
+
+      const { error: erroConvite } = await supabase
+        .from("convites")
+        .update({
+          status: "aceito",
+          proposta_id: propostaId,
+        })
+        .eq("id", convite.id);
+
+      if (erroConvite) {
+        alert(erroConvite.message);
         return;
       }
 
-      novoChatId = novoChat.id;
-    }
-
-    setChatId(novoChatId);
-
-    await carregarMensagens(novoChatId);
-    iniciarRealtime(novoChatId);
-
-    setLoading(false);
-  }
-
-  async function carregarMensagens(idChat: string) {
-    const { data } = await supabase
-      .from("mensagens")
-      .select("*")
-      .eq("chat_id", idChat)
-      .order("created_at", { ascending: true });
-
-    setMensagens(data || []);
-  }
-
-  function iniciarRealtime(idChat: string) {
-    supabase
-      .channel(`chat-${idChat}`)
-      .on(
-        "postgres_changes",
+      await supabase.from("notificacoes").insert([
         {
-          event: "*",
-          schema: "public",
-          table: "mensagens",
-          filter: `chat_id=eq.${idChat}`,
-        },
-        async () => {
-          await carregarMensagens(idChat);
-        }
-      )
-      .subscribe();
-  }
-
-  function mensagemValida(texto: string) {
-    const textoLower = texto.toLowerCase();
-
-    const bloqueados = [
-      "whatsapp",
-      "whats",
-      "zap",
-      "telefone",
-      "celular",
-      "email",
-      "e-mail",
-      "gmail",
-      "hotmail",
-      "outlook",
-      "telegram",
-      "instagram",
-      "pix",
-      "chave pix",
-    ];
-
-    if (textoLower.includes("@")) return false;
-    if (bloqueados.some((t) => textoLower.includes(t))) return false;
-
-    const numeros = texto.replace(/\D/g, "");
-
-    if (numeros.length >= 8) return false;
-
-    return true;
-  }
-
-  async function enviarMensagem() {
-    if (!usuario || !chatId) return;
-
-    if (!mensagem.trim()) return;
-
-    if (!mensagemValida(mensagem)) {
-      alert("Não é permitido compartilhar telefone, WhatsApp, PIX, email ou contato externo.");
-      return;
-    }
-
-    try {
-      setEnviando(true);
-
-      const texto = mensagem.trim();
-      setMensagem("");
-
-      const { error } = await supabase.from("mensagens").insert([
-        {
-          chat_id: chatId,
-          remetente_id: usuario.id,
-          mensagem: texto,
+          usuario_id: convite.contratante_id,
+          titulo: "Convite aceito 🚀",
+          descricao: `${usuario.nome} aceitou o convite do projeto "${convite.projeto_titulo}".`,
+          lida: false,
+          link: `/chat?proposta_id=${propostaId}`,
         },
       ]);
 
-      if (error) {
-        console.error(error);
-        alert("Erro ao enviar mensagem.");
-      }
-    } finally {
-      setEnviando(false);
+      setConvites((prev) =>
+        prev.map((c) =>
+          c.id === convite.id
+            ? {
+                ...c,
+                status: "aceito",
+                proposta_id: propostaId,
+              }
+            : c
+        )
+      );
+
+      alert("Convite aceito com sucesso! Chat liberado.");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao aceitar convite.");
     }
   }
 
-  function voltarPainel() {
-    if (usuario?.tipo_usuario === "freelancer") return "/convites";
-    if (usuario?.tipo_usuario === "contratante") return "/meus-projetos";
-    return "/";
-  }
+  async function recusarConvite(convite: Convite) {
+    const { error } = await supabase
+      .from("convites")
+      .update({ status: "recusado" })
+      .eq("id", convite.id);
 
-  if (loading) {
-    return <Loading />;
-  }
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-  if (!usuario) {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Você precisa estar logado.
-      </main>
+    await supabase.from("notificacoes").insert([
+      {
+        usuario_id: convite.contratante_id,
+        titulo: "Convite recusado",
+        descricao: `${usuario?.nome || "Freelancer"} recusou o convite do projeto "${convite.projeto_titulo}".`,
+        lida: false,
+        link: "/propostas-recebidas",
+      },
+    ]);
+
+    setConvites((prev) =>
+      prev.map((c) =>
+        c.id === convite.id ? { ...c, status: "recusado" } : c
+      )
     );
   }
 
-  if (!chatId) {
+  if (!usuario && !carregando) {
     return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        <div className="rounded-3xl border border-yellow-400/20 bg-yellow-400/10 p-8">
-          <h1 className="text-3xl font-black text-yellow-300">
-            Chat não localizado
-          </h1>
+      <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="text-4xl font-black">Meus convites</h1>
 
-          <p className="mt-3 text-slate-300">
-            Não foi possível localizar ou criar o chat deste projeto.
+          <p className="mt-4 text-slate-400">
+            Faça login como freelancer para visualizar seus convites.
           </p>
 
           <Link
-            href={voltarPainel()}
-            className="mt-6 inline-block rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
+            href="/login"
+            className="mt-8 inline-block rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950"
           >
-            Voltar
+            Fazer login
           </Link>
         </div>
       </main>
@@ -273,102 +288,126 @@ function ChatContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
-      <section className="mx-auto max-w-5xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-10 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-4xl font-black">Chat do Projeto</h1>
+            <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+              Área do freelancer
+            </span>
 
-            <p className="mt-2 text-sm text-emerald-300">
-              Conectado em tempo real
+            <h1 className="mt-4 text-5xl font-black leading-tight">
+              Meus convites
+            </h1>
+
+            <p className="mt-4 text-lg text-slate-300">
+              Convites recebidos de contratantes
             </p>
           </div>
 
-          <Link
-            href={voltarPainel()}
-            className="rounded-xl border border-white/20 px-5 py-3 font-bold hover:bg-white/5"
-          >
-            Voltar
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={carregarConvites}
+              className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
+            >
+              Atualizar
+            </button>
+
+            <Link
+              href="/painel-freelancer"
+              className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
+            >
+              Voltar
+            </Link>
+          </div>
         </div>
 
-        <div className="mb-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-sm text-yellow-100">
-          Por segurança, não compartilhe WhatsApp, telefone, PIX, e-mail ou contatos externos.
-        </div>
+        {carregando && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Carregando convites...
+          </div>
+        )}
 
-        <div
-          ref={mensagensRef}
-          className="mb-4 h-[580px] overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-900 p-6"
-        >
-          {mensagens.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-slate-400">Nenhuma mensagem ainda.</p>
-            </div>
-          )}
+        {!carregando && convites.length === 0 && (
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Nenhum convite recebido ainda.
+          </div>
+        )}
 
-          <div className="space-y-4">
-            {mensagens.map((m) => {
-              const minha = m.remetente_id === usuario.id;
+        <div className="grid gap-6">
+          {!carregando &&
+            convites.map((convite) => {
+              const conviteAceito =
+                convite.status === "aceito" ||
+                convite.status === "em_andamento";
 
               return (
                 <div
-                  key={m.id}
-                  className={`flex ${minha ? "justify-end" : "justify-start"}`}
+                  key={convite.id}
+                  className="rounded-[2rem] border border-white/10 bg-white/5 p-7 shadow-2xl"
                 >
-                  <div
-                    className={`max-w-[85%] rounded-3xl px-5 py-4 shadow-xl ${
-                      minha
-                        ? "bg-emerald-400 text-slate-950"
-                        : "bg-white/10 text-white"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap leading-7">
-                      {m.mensagem}
-                    </p>
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="mb-4 flex flex-wrap gap-3">
+                        <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
+                          {(convite.status || "pendente").toUpperCase()}
+                        </span>
+                      </div>
 
-                    {m.created_at && (
-                      <p
-                        className={`mt-3 text-right text-xs ${
-                          minha ? "text-slate-700" : "text-slate-400"
-                        }`}
-                      >
-                        {new Date(m.created_at).toLocaleTimeString("pt-BR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <h2 className="text-3xl font-black">
+                        {convite.projeto_titulo}
+                      </h2>
+
+                      <p className="mt-2 text-sm text-slate-400">
+                        Contratante: {convite.contratante_nome}
                       </p>
-                    )}
+
+                      <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
+                        {convite.mensagem || "Sem mensagem."}
+                      </p>
+                    </div>
+
+                    <div className="flex min-w-[230px] flex-col gap-3">
+                      {(!convite.status || convite.status === "pendente") && (
+                        <>
+                          <button
+                            onClick={() => aceitarConvite(convite)}
+                            className="rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+                          >
+                            Aceitar convite
+                          </button>
+
+                          <button
+                            onClick={() => recusarConvite(convite)}
+                            className="rounded-xl border border-red-400/30 px-5 py-3 font-bold text-red-300"
+                          >
+                            Recusar convite
+                          </button>
+                        </>
+                      )}
+
+                      {conviteAceito && convite.proposta_id && (
+                        <Link
+                          href={`/chat?proposta_id=${convite.proposta_id}`}
+                          className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
+                        >
+                          Abrir chat
+                        </Link>
+                      )}
+
+                      <Link
+                        href={`/projetos/${convite.projeto_id}`}
+                        className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"
+                      >
+                        Ver projeto convidado
+                      </Link>
+                    </div>
                   </div>
                 </div>
               );
             })}
-          </div>
         </div>
-
-        <div className="flex gap-3">
-          <textarea
-            rows={2}
-            value={mensagem}
-            onChange={(e) => setMensagem(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                enviarMensagem();
-              }
-            }}
-            placeholder="Digite sua mensagem..."
-            className="flex-1 resize-none rounded-2xl border border-white/10 bg-slate-900 px-5 py-4 text-white outline-none placeholder:text-slate-500"
-          />
-
-          <button
-            onClick={enviarMensagem}
-            disabled={enviando}
-            className="rounded-2xl bg-emerald-400 px-8 py-4 font-black text-slate-950 disabled:opacity-60"
-          >
-            {enviando ? "..." : "Enviar"}
-          </button>
-        </div>
-      </section>
+      </div>
     </main>
   );
 }
