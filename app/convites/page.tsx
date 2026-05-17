@@ -58,8 +58,13 @@ export default function ConvitesPage() {
       return;
     }
 
-    const projetoIds = [...new Set(data.map((c: any) => c.projeto_id).filter(Boolean))];
-    const contratanteIds = [...new Set(data.map((c: any) => c.contratante_id).filter(Boolean))];
+    const projetoIds = [
+      ...new Set(data.map((c: any) => c.projeto_id).filter(Boolean)),
+    ];
+
+    const contratanteIds = [
+      ...new Set(data.map((c: any) => c.contratante_id).filter(Boolean)),
+    ];
 
     let projetosMap: Record<string, any> = {};
     let contratantesMap: Record<string, any> = {};
@@ -89,7 +94,8 @@ export default function ConvitesPage() {
     const convitesFormatados = data.map((c: any) => ({
       ...c,
       projeto_titulo: projetosMap[c.projeto_id]?.titulo || "Projeto",
-      contratante_nome: contratantesMap[c.contratante_id]?.nome || "Contratante",
+      contratante_nome:
+        contratantesMap[c.contratante_id]?.nome || "Contratante",
     }));
 
     setConvites(convitesFormatados);
@@ -188,7 +194,9 @@ export default function ConvitesPage() {
     ]);
 
     setConvites((prev) =>
-      prev.map((c) => (c.id === convite.id ? { ...c, status: "recusado" } : c))
+      prev.map((c) =>
+        c.id === convite.id ? { ...c, status: "recusado" } : c
+      )
     );
   }
 
@@ -197,6 +205,7 @@ export default function ConvitesPage() {
       <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
         <div className="mx-auto max-w-5xl">
           <h1 className="text-4xl font-black">Meus convites</h1>
+
           <p className="mt-4 text-slate-400">
             Faça login como freelancer para visualizar seus convites.
           </p>
@@ -316,10 +325,10 @@ export default function ConvitesPage() {
                     )}
 
                     <Link
-                      href={`/projeto/${convite.projeto_id}`}
-                      className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"                  
+                      href={`/projetos/${convite.projeto_id}`}
+                      className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"
                     >
-                      Ver projetos
+                      Ver projeto convidado
                     </Link>
                   </div>
                 </div>
