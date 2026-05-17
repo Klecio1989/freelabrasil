@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -29,10 +29,26 @@ function ChatContent() {
   const [chatId, setChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [online, setOnline] = useState(false);
+
+  const mensagensRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     carregarTudo();
   }, []);
+
+  useEffect(() => {
+    scrollFinal();
+  }, [mensagens]);
+
+  function scrollFinal() {
+    setTimeout(() => {
+      mensagensRef.current?.scrollTo({
+        top: mensagensRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 100);
+  }
 
   async function carregarTudo() {
     setLoading(true);
@@ -52,63 +68,130 @@ function ChatContent() {
       return;
     }
 
-    const { data: proposta, error: propostaError } = await supabase
+    const { data: proposta, error: erroProposta } = await supabase
       .from("propostas")
       .select("id, projeto_id, freelancer_id")
       .eq("id", propostaId)
       .maybeSingle();
 
-    if (propostaError || !proposta) {
-      console.error(propostaError);
+    if (erroProposta || !proposta) {
+      console.error("Erro proposta:", erroProposta);
       setLoading(false);
       return;
     }
 
-    const { data: andamento } = await supabase
-      .from("projetos_andamento")
-      .select("contratante_id")
-      .eq("projeto_id", proposta.projeto_id)
+    let contratanteId = null;
+
+    const { data: projeto } = await supabase
+      .from("projetos")
+      .select("id, contratante_id")
+      .eq("id", proposta.projeto_id)
       .maybeSingle();
 
-    const contratanteId = andamento?.contratante_id;
+    contratanteId = projeto?.contratante_id || null;
 
-    const { data: chatExistente, error: chatError } = await supabase
+    if (!contratanteId) {
+      const { data: andamento } = await supabase
+        .from("projetos_andamento")
+        .select("contratante_id")
+        .eq("proposta_id", proposta.id)
+        .maybeSingle();
+
+      contratanteId = andamento?.contratante_id || null;
+    }
+
+    if (!contratanteId) {
+      alert("Contratante não localizado para este projeto.");
+      setLoading(false);
+      return;
+    }
+
+    let chatIdEncontrado = null;
+
+    const { data: chatPorProposta } = await supabase
       .from("chats")
       .select("id")
-      .eq("projeto_id", proposta.projeto_id)
-      .eq("freela_id", proposta.freelancer_id)
-      .eq("contratante_id", contratanteId)
+      .eq("proposta_id", proposta.id)
       .maybeSingle();
 
-    if (chatError) {
-      console.error(chatError);
-      setLoading(false);
-      return;
+    chatIdEncontrado = chatPorProposta?.id || null;
+
+    if (!chatIdEncontrado) {
+      const { data: chatPorProjeto } = await supabase
+        .from("chats")
+        .select("id")
+        .eq("projeto_id", proposta.projeto_id)
+        .eq("freela_id", proposta.freelancer_id)
+        .eq("contratante_id", contratanteId)
+        .maybeSingle();
+
+      chatIdEncontrado = chatPorProjeto?.id || null;
     }
 
-    if (!chatExistente) {
-      setLoading(false);
-      return;
+    if (!chatIdEncontrado) {
+      const { data: novoChat, error: erroCriarChat } = await supabase
+        .from("chats")
+        .insert([
+          {
+            projeto_id: proposta.projeto_id,
+            freela_id: proposta.freelancer_id,
+            contratante_id: contratanteId,
+            proposta_id: proposta.id,
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (erroCriarChat) {
+        console.error("Erro ao criar chat:", erroCriarChat);
+        alert("Erro ao criar chat: " + erroCriarChat.message);
+        setLoading(false);
+        return;
+      }
+
+      chatIdEncontrado = novoChat.id;
+    } else {
+      await supabase
+        .from("chats")
+        .update({ proposta_id: proposta.id })
+        .eq("id", chatIdEncontrado)
+        .is("proposta_id", null);
     }
 
-    setChatId(chatExistente.id);
-    await carregarMensagens(chatExistente.id);
+    setChatId(chatIdEncontrado);
+
+    await carregarMensagens(chatIdEncontrado);
+    iniciarRealtime(chatIdEncontrado);
 
     setLoading(false);
   }
 
+  function iniciarRealtime(idChat: string) {
+    setOnline(true);
+
+    supabase
+      .channel(`chat-${idChat}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mensagens",
+          filter: `chat_id=eq.${idChat}`,
+        },
+        async () => {
+          await carregarMensagens(idChat);
+        }
+      )
+      .subscribe();
+  }
+
   async function carregarMensagens(idChat: string) {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("mensagens")
       .select("*")
       .eq("chat_id", idChat)
       .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error(error);
-      setMensagens([]);
-      return;
-    }
 
     setMensagens(data || []);
   }
@@ -146,9 +229,6 @@ function ChatContent() {
 
     if (numeros.length >= 8) return false;
 
-    const regexEmail = /\S+@\S+\.\S+/;
-    if (regexEmail.test(textoLower)) return false;
-
     return true;
   }
 
@@ -167,7 +247,7 @@ function ChatContent() {
 
     if (!mensagemValida(mensagem)) {
       alert(
-        "Não é permitido compartilhar contato externo, PIX, telefone, e-mail ou WhatsApp. Mantenha a negociação dentro da FreellaBrasil."
+        "Não é permitido compartilhar telefone, WhatsApp, PIX, email ou contato externo."
       );
       return;
     }
@@ -175,29 +255,28 @@ function ChatContent() {
     try {
       setEnviando(true);
 
+      const textoMensagem = mensagem.trim();
+      setMensagem("");
+
       const { error } = await supabase.from("mensagens").insert([
         {
           chat_id: chatId,
           remetente_id: usuario.id,
-          mensagem: mensagem.trim(),
+          mensagem: textoMensagem,
         },
       ]);
 
       if (error) {
         console.error(error);
         alert("Erro ao enviar mensagem.");
-        return;
       }
-
-      setMensagem("");
-      await carregarMensagens(chatId);
     } finally {
       setEnviando(false);
     }
   }
 
   function voltarPainel() {
-    if (usuario?.tipo_usuario === "freelancer") return "/meus-trabalhos";
+    if (usuario?.tipo_usuario === "freelancer") return "/convites";
     if (usuario?.tipo_usuario === "contratante") return "/meus-projetos";
     return "/";
   }
@@ -225,8 +304,9 @@ function ChatContent() {
           <h1 className="text-3xl font-black text-yellow-300">
             Chat não localizado
           </h1>
+
           <p className="mt-3 text-slate-300">
-            O chat será criado automaticamente quando a proposta for aceita.
+            Não foi possível localizar ou criar o chat deste projeto.
           </p>
 
           <Link
@@ -241,32 +321,46 @@ function ChatContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <section className="mx-auto max-w-4xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+      <section className="mx-auto max-w-5xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-black">Chat do Projeto</h1>
-            <p className="mt-2 text-slate-400">
-              Mantenha toda negociação dentro da FreellaBrasil.
-            </p>
+
+            <div className="mt-2 flex items-center gap-2">
+              <div
+                className={`h-2.5 w-2.5 rounded-full ${
+                  online ? "bg-emerald-400" : "bg-slate-500"
+                }`}
+              />
+
+              <p className="text-sm text-slate-400">
+                {online ? "Conectado em tempo real" : "Offline"}
+              </p>
+            </div>
           </div>
 
           <Link
             href={voltarPainel()}
-            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+            className="rounded-xl border border-white/20 px-5 py-3 font-bold hover:bg-white/5"
           >
             Voltar
           </Link>
         </div>
 
         <div className="mb-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-sm text-yellow-100">
-          Por segurança, não é permitido compartilhar telefone, WhatsApp, e-mail,
-          PIX ou contato externo. Violações podem gerar bloqueio ou banimento.
+          Por segurança, não compartilhe WhatsApp, telefone, PIX, e-mail ou
+          contatos externos. Violações podem gerar bloqueio permanente.
         </div>
 
-        <div className="mb-4 h-[460px] overflow-y-auto rounded-3xl border border-white/10 bg-slate-900 p-5">
+        <div
+          ref={mensagensRef}
+          className="mb-4 h-[580px] overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-900 p-6"
+        >
           {mensagens.length === 0 && (
-            <p className="text-slate-400">Nenhuma mensagem ainda.</p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-slate-400">Nenhuma mensagem ainda.</p>
+            </div>
           )}
 
           <div className="space-y-4">
@@ -282,23 +376,28 @@ function ChatContent() {
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    className={`max-w-[85%] rounded-3xl px-5 py-4 shadow-xl ${
                       minhaMensagem
                         ? "bg-emerald-400 text-slate-950"
                         : "bg-white/10 text-white"
                     }`}
                   >
-                    <p className="leading-7">{m.mensagem}</p>
+                    <p className="whitespace-pre-wrap leading-7">
+                      {m.mensagem}
+                    </p>
 
-                    {m.created_at && (
-                      <p
-                        className={`mt-2 text-xs ${
-                          minhaMensagem ? "text-slate-700" : "text-slate-400"
-                        }`}
-                      >
-                        {new Date(m.created_at).toLocaleString("pt-BR")}
-                      </p>
-                    )}
+                    <div
+                      className={`mt-3 flex items-center justify-end gap-2 text-xs ${
+                        minhaMensagem ? "text-slate-700" : "text-slate-400"
+                      }`}
+                    >
+                      <span>
+                        {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -307,22 +406,26 @@ function ChatContent() {
         </div>
 
         <div className="flex gap-3">
-          <input
+          <textarea
+            rows={2}
             value={mensagem}
             onChange={(e) => setMensagem(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") enviarMensagem();
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                enviarMensagem();
+              }
             }}
             placeholder="Digite sua mensagem..."
-            className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none placeholder:text-slate-500"
+            className="flex-1 resize-none rounded-2xl border border-white/10 bg-slate-900 px-5 py-4 text-white outline-none placeholder:text-slate-500"
           />
 
           <button
             onClick={enviarMensagem}
             disabled={enviando}
-            className="rounded-xl bg-emerald-400 px-6 py-3 font-black text-slate-950 disabled:opacity-60"
+            className="rounded-2xl bg-emerald-400 px-8 py-4 font-black text-slate-950 disabled:opacity-60"
           >
-            {enviando ? "Enviando..." : "Enviar"}
+            {enviando ? "..." : "Enviar"}
           </button>
         </div>
       </section>
