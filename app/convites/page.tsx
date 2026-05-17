@@ -38,6 +38,7 @@ export default function ConvitesPage() {
     }
 
     const parsed = JSON.parse(usuarioSalvo);
+
     setUsuario(parsed);
 
     const { data, error } = await supabase
@@ -105,71 +106,115 @@ export default function ConvitesPage() {
   async function aceitarConvite(convite: Convite) {
     if (!usuario) return;
 
-    const { data: propostaExistente } = await supabase
-      .from("propostas")
-      .select("id")
-      .eq("freelancer_id", convite.freelancer_id)
-      .eq("projeto_id", convite.projeto_id)
-      .maybeSingle();
+    try {
+      let propostaId = convite.proposta_id;
 
-    let propostaId = propostaExistente?.id;
+      if (!propostaId) {
+        const { data: propostaExistente } = await supabase
+          .from("propostas")
+          .select("id")
+          .eq("freelancer_id", convite.freelancer_id)
+          .eq("projeto_id", convite.projeto_id)
+          .maybeSingle();
 
-    if (!propostaId) {
-      const { data: novaProposta, error: erroProposta } = await supabase
-        .from("propostas")
-        .insert([
-          {
-            freelancer_id: convite.freelancer_id,
-            projeto_id: convite.projeto_id,
-            valor: 0,
-            prazo: 0,
-            mensagem: convite.mensagem || "Convite aceito pelo freelancer.",
-            status: "aceita",
-          },
-        ])
+        propostaId = propostaExistente?.id;
+
+        if (!propostaId) {
+          const { data: novaProposta, error: erroProposta } =
+            await supabase
+              .from("propostas")
+              .insert([
+                {
+                  freelancer_id: convite.freelancer_id,
+                  projeto_id: convite.projeto_id,
+                  valor: 0,
+                  prazo: 0,
+                  mensagem:
+                    convite.mensagem ||
+                    "Convite aceito pelo freelancer.",
+                  status: "aceita",
+                },
+              ])
+              .select("id")
+              .single();
+
+          if (erroProposta) {
+            alert(erroProposta.message);
+            return;
+          }
+
+          propostaId = novaProposta.id;
+        }
+      }
+
+      const { data: andamentoExistente } = await supabase
+        .from("projetos_andamento")
         .select("id")
-        .single();
+        .eq("projeto_id", convite.projeto_id)
+        .eq("freela_id", convite.freelancer_id)
+        .maybeSingle();
 
-      if (erroProposta) {
-        alert(erroProposta.message);
+      if (!andamentoExistente) {
+        const { error: erroAndamento } = await supabase
+          .from("projetos_andamento")
+          .insert([
+            {
+              projeto_id: convite.projeto_id,
+              freela_id: convite.freelancer_id,
+              contratante_id: convite.contratante_id,
+              proposta_id: propostaId,
+              status: "em_andamento",
+              data_inicio: new Date().toISOString(),
+            },
+          ]);
+
+        if (erroAndamento) {
+          console.error(erroAndamento);
+          alert("Erro ao iniciar projeto.");
+          return;
+        }
+      }
+
+      const { error: erroConvite } = await supabase
+        .from("convites")
+        .update({
+          status: "aceito",
+          proposta_id: propostaId,
+        })
+        .eq("id", convite.id);
+
+      if (erroConvite) {
+        alert(erroConvite.message);
         return;
       }
 
-      propostaId = novaProposta.id;
+      await supabase.from("notificacoes").insert([
+        {
+          usuario_id: convite.contratante_id,
+          titulo: "Convite aceito 🚀",
+          descricao: `${usuario.nome} aceitou o convite do projeto "${convite.projeto_titulo}".`,
+          lida: false,
+          link: `/chat?proposta_id=${propostaId}`,
+        },
+      ]);
+
+      setConvites((prev) =>
+        prev.map((c) =>
+          c.id === convite.id
+            ? {
+                ...c,
+                status: "aceito",
+                proposta_id: propostaId,
+              }
+            : c
+        )
+      );
+
+      alert("Convite aceito com sucesso!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao aceitar convite.");
     }
-
-    const { error: erroConvite } = await supabase
-      .from("convites")
-      .update({
-        status: "aceito",
-        proposta_id: propostaId,
-      })
-      .eq("id", convite.id);
-
-    if (erroConvite) {
-      alert(erroConvite.message);
-      return;
-    }
-
-    await supabase.from("notificacoes").insert([
-      {
-        usuario_id: convite.contratante_id,
-        titulo: "Convite aceito",
-        descricao: `${usuario.nome || "Freelancer"} aceitou o convite do projeto "${convite.projeto_titulo}".`,
-        lida: false,
-        link: `/chat?proposta_id=${propostaId}`,
-      },
-    ]);
-
-    setConvites((prev) =>
-      prev.map((c) =>
-        c.id === convite.id
-          ? { ...c, status: "aceito", proposta_id: propostaId }
-          : c
-      )
-    );
-
-    alert("Convite aceito. Chat liberado.");
   }
 
   async function recusarConvite(convite: Convite) {
@@ -195,7 +240,9 @@ export default function ConvitesPage() {
 
     setConvites((prev) =>
       prev.map((c) =>
-        c.id === convite.id ? { ...c, status: "recusado" } : c
+        c.id === convite.id
+          ? { ...c, status: "recusado" }
+          : c
       )
     );
   }
@@ -224,7 +271,9 @@ export default function ConvitesPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-14">
       <div className="mx-auto max-w-6xl">
+
         <div className="mb-10 flex items-center justify-between gap-4 flex-wrap">
+
           <div>
             <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
               Área do freelancer
@@ -240,6 +289,7 @@ export default function ConvitesPage() {
           </div>
 
           <div className="flex gap-3">
+
             <button
               onClick={carregarConvites}
               className="rounded-xl border border-white/20 px-5 py-3 font-medium text-white"
@@ -253,6 +303,7 @@ export default function ConvitesPage() {
             >
               Voltar
             </Link>
+
           </div>
         </div>
 
@@ -269,18 +320,24 @@ export default function ConvitesPage() {
         )}
 
         <div className="grid gap-6">
+
           {!carregando &&
             convites.map((convite) => (
               <div
                 key={convite.id}
                 className="rounded-[2rem] border border-white/10 bg-white/5 p-7 shadow-2xl"
               >
+
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+
                   <div>
+
                     <div className="mb-4 flex flex-wrap gap-3">
+
                       <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
                         {(convite.status || "pendente").toUpperCase()}
                       </span>
+
                     </div>
 
                     <h2 className="text-3xl font-black">
@@ -294,10 +351,13 @@ export default function ConvitesPage() {
                     <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
                       {convite.mensagem || "Sem mensagem."}
                     </p>
+
                   </div>
 
                   <div className="flex min-w-[230px] flex-col gap-3">
-                    {(!convite.status || convite.status === "pendente") && (
+
+                    {(!convite.status ||
+                      convite.status === "pendente") && (
                       <>
                         <button
                           onClick={() => aceitarConvite(convite)}
@@ -315,14 +375,15 @@ export default function ConvitesPage() {
                       </>
                     )}
 
-                    {convite.status === "aceito" && convite.proposta_id && (
-                      <Link
-                        href={`/chat?proposta_id=${convite.proposta_id}`}
-                        className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
-                      >
-                        Abrir chat
-                      </Link>
-                    )}
+                    {convite.status === "aceito" &&
+                      convite.proposta_id && (
+                        <Link
+                          href={`/chat?proposta_id=${convite.proposta_id}`}
+                          className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950"
+                        >
+                          Abrir chat
+                        </Link>
+                      )}
 
                     <Link
                       href={`/projetos/${convite.projeto_id}`}
@@ -330,6 +391,7 @@ export default function ConvitesPage() {
                     >
                       Ver projeto convidado
                     </Link>
+
                   </div>
                 </div>
               </div>
