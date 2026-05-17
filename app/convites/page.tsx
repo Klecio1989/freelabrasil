@@ -115,7 +115,7 @@ export default function ConvitesPage() {
           {
             freelancer_id: convite.freelancer_id,
             projeto_id: convite.projeto_id,
-            valor: "A negociar",
+            valor: 0,
             prazo: 0,
             mensagem: convite.mensagem || "Convite aceito pelo freelancer.",
             status: "aceita",
