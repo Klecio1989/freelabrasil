@@ -316,8 +316,8 @@ export default function ConvitesPage() {
                     )}
 
                     <Link
-                      href="/projetos"
-                      className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"
+                      href={`/projeto/${convite.projeto_id}`}
+                      className="rounded-xl border border-white/20 px-5 py-3 text-center font-medium text-white"                  
                     >
                       Ver projetos
                     </Link>
