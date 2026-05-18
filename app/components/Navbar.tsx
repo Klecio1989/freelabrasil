@@ -69,6 +69,9 @@ export default function Navbar() {
       await carregarNotificacoes(usuario.id);
     }
 
+    setNotificacoesAberto(false);
+    setMenuAberto(false);
+
     if (link) {
       window.location.href = link;
     }
@@ -96,6 +99,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-slate-950/95 backdrop-blur text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        {/* LOGO */}
         <Link href="/" className="flex items-center gap-3">
           <img
             src="/logo-freellabrasil.png"
@@ -104,6 +108,7 @@ export default function Navbar() {
           />
         </Link>
 
+        {/* MENU */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
           <Link href="/projetos" className="hover:text-emerald-400">
             Buscar projetos
@@ -136,7 +141,7 @@ export default function Navbar() {
           </div>
         ) : (
           <div className="relative flex items-center gap-4">
-            {/* SINO */}
+            {/* NOTIFICAÇÕES */}
             <div className="relative">
               <button
                 onClick={() => {
@@ -144,7 +149,6 @@ export default function Navbar() {
                   setMenuAberto(false);
                 }}
                 className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl hover:bg-white/10"
-                title="Notificações"
               >
                 🔔
 
@@ -220,6 +224,7 @@ export default function Navbar() {
 
                   <Link
                     href="/notificacoes"
+                    onClick={() => setNotificacoesAberto(false)}
                     className="block border-t border-white/10 p-4 text-center text-sm font-bold text-emerald-300 hover:bg-white/5"
                   >
                     Ver todas
@@ -228,7 +233,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* MENU */}
+            {/* MENU USUÁRIO */}
             <button
               onClick={() => {
                 setMenuAberto(!menuAberto);
@@ -246,10 +251,11 @@ export default function Navbar() {
             </button>
 
             {menuAberto && (
-              <div className="absolute right-0 top-14 w-64 rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+              <div className="absolute right-0 top-14 z-50 w-64 rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
                 <div className="flex flex-col p-2 text-sm">
                   <Link
                     href="/perfil"
+                    onClick={() => setMenuAberto(false)}
                     className="px-4 py-3 hover:bg-white/5"
                   >
                     Meu Perfil
@@ -259,6 +265,7 @@ export default function Navbar() {
                     <>
                       <Link
                         href="/meus-projetos"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 hover:bg-white/5"
                       >
                         Meus projetos
@@ -266,6 +273,7 @@ export default function Navbar() {
 
                       <Link
                         href="/convites"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 hover:bg-white/5"
                       >
                         Meus convites
@@ -273,6 +281,7 @@ export default function Navbar() {
 
                       <Link
                         href="/saques"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 hover:bg-white/5"
                       >
                         Saques
@@ -283,6 +292,7 @@ export default function Navbar() {
                   {usuario.tipo_usuario === "contratante" && (
                     <Link
                       href="/propostas-recebidas"
+                      onClick={() => setMenuAberto(false)}
                       className="px-4 py-3 hover:bg-white/5"
                     >
                       Propostas recebidas
@@ -291,6 +301,7 @@ export default function Navbar() {
 
                   <Link
                     href="/dashboard-financeiro"
+                    onClick={() => setMenuAberto(false)}
                     className="px-4 py-3 hover:bg-white/5"
                   >
                     Financeiro
@@ -302,6 +313,7 @@ export default function Navbar() {
 
                       <Link
                         href="/admin"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 font-bold text-emerald-300 hover:bg-white/5"
                       >
                         Admin
@@ -309,6 +321,7 @@ export default function Navbar() {
 
                       <Link
                         href="/admin/denuncias"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 hover:bg-white/5"
                       >
                         Denúncias
@@ -316,6 +329,7 @@ export default function Navbar() {
 
                       <Link
                         href="/admin/saques"
+                        onClick={() => setMenuAberto(false)}
                         className="px-4 py-3 hover:bg-white/5"
                       >
                         Saques admin
