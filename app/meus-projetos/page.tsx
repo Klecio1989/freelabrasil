@@ -7,46 +7,28 @@ export default function MeusProjetos() {
   const [usuario, setUsuario] = useState<any>(null);
   const [projetos, setProjetos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processando, setProcessando] = useState<string | null>(null);
 
   useEffect(() => {
     carregarUsuario();
   }, []);
 
   async function carregarUsuario() {
-    const { data } = await supabase.auth.getUser();
+    setLoading(true);
 
-    if (!data?.user) {
+    const userLocal = localStorage.getItem("freelabrasil_usuario");
+
+    if (!userLocal) {
+      setUsuario(null);
       setLoading(false);
       return;
     }
 
-    const authUser = data.user;
+    const user = JSON.parse(userLocal);
 
-    const localUser = localStorage.getItem("freelabrasil_usuario");
+    setUsuario(user);
 
-    let usuarioFinal: any = {
-      id: authUser.id,
-    };
-
-    if (localUser) {
-      try {
-        const parsed = JSON.parse(localUser);
-
-        usuarioFinal = {
-          ...parsed,
-          id: authUser.id,
-        };
-      } catch {
-        usuarioFinal.id = authUser.id;
-      }
-    }
-
-    setUsuario(usuarioFinal);
-
-    console.log("USUARIO LOGADO:", usuarioFinal);
-
-    await carregarProjetos(usuarioFinal);
-
+    await carregarProjetos(user);
   }
 
   async function carregarProjetos(user: any) {
@@ -55,7 +37,14 @@ export default function MeusProjetos() {
     let query = supabase
       .from("projetos_andamento")
       .select(`
-        *,
+        id,
+        status,
+        data_inicio,
+        data_finalizacao,
+        data_confirmacao,
+        projeto_id,
+        freela_id,
+        contratante_id,
         projetos (
           id,
           titulo,
@@ -66,17 +55,19 @@ export default function MeusProjetos() {
       `)
       .order("data_inicio", { ascending: false });
 
+    if (user.tipo_usuario === "freelancer") {
+      query = query.eq("freela_id", user.id);
+    }
+
     if (user.tipo_usuario === "contratante") {
       query = query.eq("contratante_id", user.id);
-    } else {
-      query = query.eq("freela_id", user.id);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      console.error(error);
-      alert("Erro ao carregar projetos");
+      console.error("Erro ao carregar projetos:", error);
+      alert("Erro ao carregar projetos.");
       setProjetos([]);
     } else {
       setProjetos(data || []);
@@ -85,12 +76,12 @@ export default function MeusProjetos() {
     setLoading(false);
   }
 
-  async function finalizarProjeto(id: string) {
-    const confirmar = confirm(
-      "Deseja informar que finalizou este projeto?"
-    );
+  async function finalizarProjeto(item: any) {
+    const confirmar = confirm("Deseja informar que finalizou este projeto?");
 
     if (!confirmar) return;
+
+    setProcessando(item.id);
 
     const { error } = await supabase
       .from("projetos_andamento")
@@ -98,25 +89,41 @@ export default function MeusProjetos() {
         status: "finalizado_freela",
         data_finalizacao: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", item.id);
 
     if (error) {
-      console.error(error);
-      alert("Erro ao finalizar projeto");
+      console.error("Erro ao finalizar projeto:", error);
+      alert("Erro ao finalizar projeto.");
+      setProcessando(null);
       return;
     }
 
-    alert("Projeto enviado para confirmação.");
+    if (item.contratante_id) {
+      await supabase.from("notificacoes").insert({
+        usuario_id: item.contratante_id,
+        titulo: "Projeto finalizado",
+        descricao: `O freelancer informou que finalizou o projeto: ${
+          item.projetos?.titulo || "Projeto"
+        }.`,
+        link: "/meus-projetos",
+        lida: false,
+      });
+    }
 
-    carregarProjetos(usuario);
+    alert("Projeto enviado para confirmação do contratante.");
+
+    setProcessando(null);
+    await carregarProjetos(usuario);
   }
 
-  async function confirmarConclusao(id: string) {
+  async function confirmarConclusao(item: any) {
     const confirmar = confirm(
       "Deseja confirmar a conclusão deste projeto?"
     );
 
     if (!confirmar) return;
+
+    setProcessando(item.id);
 
     const { error } = await supabase
       .from("projetos_andamento")
@@ -124,49 +131,45 @@ export default function MeusProjetos() {
         status: "concluido",
         data_confirmacao: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", item.id);
 
     if (error) {
-      console.error(error);
-      alert("Erro ao confirmar projeto");
+      console.error("Erro ao confirmar conclusão:", error);
+      alert("Erro ao confirmar conclusão.");
+      setProcessando(null);
       return;
+    }
+
+    if (item.freela_id) {
+      await supabase.from("notificacoes").insert({
+        usuario_id: item.freela_id,
+        titulo: "Projeto concluído",
+        descricao: `O contratante confirmou a conclusão do projeto: ${
+          item.projetos?.titulo || "Projeto"
+        }.`,
+        link: "/meus-projetos",
+        lida: false,
+      });
     }
 
     alert("Projeto concluído com sucesso.");
 
-    carregarProjetos(usuario);
-  }
-
-  function badge(status: string) {
-    if (status === "em_andamento") {
-      return "bg-blue-500";
-    }
-
-    if (status === "finalizado_freela") {
-      return "bg-yellow-500";
-    }
-
-    if (status === "concluido") {
-      return "bg-emerald-500";
-    }
-
-    return "bg-slate-500";
+    setProcessando(null);
+    await carregarProjetos(usuario);
   }
 
   function textoStatus(status: string) {
-    if (status === "em_andamento") {
-      return "Em andamento";
-    }
+    if (status === "em_andamento") return "Em andamento";
+    if (status === "finalizado_freela") return "Aguardando confirmação";
+    if (status === "concluido") return "Concluído";
+    return status || "Sem status";
+  }
 
-    if (status === "finalizado_freela") {
-      return "Aguardando confirmação";
-    }
-
-    if (status === "concluido") {
-      return "Concluído";
-    }
-
-    return status;
+  function corStatus(status: string) {
+    if (status === "em_andamento") return "bg-blue-500";
+    if (status === "finalizado_freela") return "bg-yellow-500";
+    if (status === "concluido") return "bg-emerald-500";
+    return "bg-slate-500";
   }
 
   if (loading) {
@@ -177,15 +180,29 @@ export default function MeusProjetos() {
     );
   }
 
+  if (!usuario) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
+        <section className="mx-auto max-w-6xl">
+          <h1 className="text-5xl font-black">Meus projetos</h1>
+
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+            Você precisa estar logado.
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
       <section className="mx-auto max-w-6xl">
-        <h1 className="text-5xl font-black">
-          Meus projetos
-        </h1>
+        <h1 className="text-5xl font-black">Meus projetos</h1>
 
         <p className="mt-4 text-lg text-slate-300">
-          Acompanhe seus projetos em andamento.
+          {usuario.tipo_usuario === "freelancer"
+            ? "Acompanhe os projetos que você aceitou e está trabalhando."
+            : "Acompanhe os projetos dos freelancers e confirme as conclusões."}
         </p>
 
         {projetos.length === 0 && (
@@ -203,16 +220,16 @@ export default function MeusProjetos() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-black">
-                    {item.projetos?.titulo}
+                    {item.projetos?.titulo || "Projeto sem título"}
                   </h2>
 
-                  <p className="mt-3 text-slate-400">
-                    {item.projetos?.descricao}
+                  <p className="mt-3 max-w-3xl text-slate-400">
+                    {item.projetos?.descricao || "Sem descrição informada."}
                   </p>
                 </div>
 
                 <span
-                  className={`rounded-full px-4 py-2 text-sm font-black text-white ${badge(
+                  className={`rounded-full px-4 py-2 text-sm font-black text-white ${corStatus(
                     item.status
                   )}`}
                 >
@@ -222,60 +239,69 @@ export default function MeusProjetos() {
 
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
-                  <p className="text-sm text-slate-400">
-                    Orçamento
-                  </p>
-
+                  <p className="text-sm text-slate-400">Orçamento</p>
                   <p className="mt-1 font-bold">
-                    R$ {item.projetos?.orcamento || 0}
+                    {item.projetos?.orcamento
+                      ? `R$ ${item.projetos.orcamento}`
+                      : "Não informado"}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
-                  <p className="text-sm text-slate-400">
-                    Prazo
-                  </p>
-
+                  <p className="text-sm text-slate-400">Prazo</p>
                   <p className="mt-1 font-bold">
                     {item.projetos?.prazo || "Não informado"}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
-                  <p className="text-sm text-slate-400">
-                    Início
-                  </p>
-
+                  <p className="text-sm text-slate-400">Início</p>
                   <p className="mt-1 font-bold">
                     {item.data_inicio
-                      ? new Date(
-                          item.data_inicio
-                        ).toLocaleDateString("pt-BR")
+                      ? new Date(item.data_inicio).toLocaleDateString("pt-BR")
                       : "Não informado"}
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                {usuario?.tipo_usuario === "freelancer" &&
+                {usuario.tipo_usuario === "freelancer" &&
                   item.status === "em_andamento" && (
                     <button
-                      onClick={() => finalizarProjeto(item.id)}
-                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950 hover:bg-emerald-300"
+                      onClick={() => finalizarProjeto(item)}
+                      disabled={processando === item.id}
+                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950 hover:bg-emerald-300 disabled:opacity-50"
                     >
-                      Finalizei o projeto
+                      {processando === item.id
+                        ? "Enviando..."
+                        : "Finalizei o projeto"}
                     </button>
                   )}
 
-                {usuario?.tipo_usuario === "contratante" &&
+                {usuario.tipo_usuario === "contratante" &&
                   item.status === "finalizado_freela" && (
                     <button
-                      onClick={() => confirmarConclusao(item.id)}
-                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950 hover:bg-emerald-300"
+                      onClick={() => confirmarConclusao(item)}
+                      disabled={processando === item.id}
+                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950 hover:bg-emerald-300 disabled:opacity-50"
                     >
-                      Confirmar conclusão
+                      {processando === item.id
+                        ? "Confirmando..."
+                        : "Confirmar conclusão"}
                     </button>
                   )}
+
+                {item.status === "finalizado_freela" && (
+                  <p className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-5 py-3 font-bold text-yellow-300">
+                    Aguardando confirmação do contratante.
+                  </p>
+                )}
+
+                {item.status === "concluido" && (
+                  <p className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 font-bold text-emerald-300">
+                    Projeto concluído com sucesso.
+                  </p>
+                )}
               </div>
             </div>
           ))}
