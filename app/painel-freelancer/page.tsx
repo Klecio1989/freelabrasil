@@ -1,109 +1,83 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 export default function PainelFreelancer() {
-  const [usuario, setUsuario] = useState<any>(null);
-
-  useEffect(() => {
-    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
-    if (usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo));
-    }
-  }, []);
-
-  function badgePlano(plano?: string) {
-    if (plano === "pro") {
-      return <span className="rounded-full bg-purple-500 px-3 py-1 text-xs font-bold text-white">PRO</span>;
-    }
-
-    if (plano === "plus") {
-      return <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">PLUS</span>;
-    }
-
-    return <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-bold text-white">GRATUITO</span>;
-  }
-
-  function cardDestaque(plano?: string) {
-    if (plano === "pro") return "border-purple-500/50 bg-purple-500/5";
-    if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/5";
-    return "border-white/10 bg-slate-900";
-  }
-
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-6">
-      <div
-        className={`p-10 rounded-2xl space-y-6 text-center min-w-[380px] border ${cardDestaque(
-          usuario?.plano
-        )}`}
-      >
-        <div className="flex items-center justify-center gap-3">
-          <h1 className="text-3xl font-bold">Painel do Freelancer</h1>
-          {badgePlano(usuario?.plano)}
-        </div>
+    <main style={container}>
+      <h1 style={titulo}>Painel do Freelancer</h1>
 
-        <p className="text-slate-400">Gerencie propostas e plano</p>
+      <p style={subtitulo}>
+        Gerencie seus projetos, propostas e acompanhe seus trabalhos.
+      </p>
 
-        {usuario && (
-          <div className="bg-slate-800 rounded-xl p-4 text-left space-y-2">
-            <p>Usuário: <b>{usuario.nome}</b></p>
-            <p>Plano: <b>{usuario.plano || "gratuito"}</b></p>
-            <p>Propostas enviadas: <b>{usuario.propostas_enviadas || 0}</b></p>
-          </div>
-        )}
+      <div style={grid}>
+        <Link href="/minhas-propostas" style={card}>
+          <h2>Minhas propostas</h2>
 
-        <div className="flex flex-col gap-4">
-          <Link
-            href="/dashboard"
-            className="bg-yellow-400 text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Dashboard
-          </Link>
+          <p>
+            Visualize todas as propostas enviadas.
+          </p>
+        </Link>
 
-          <Link
-            href="/projetos"
-            className="bg-emerald-400 text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Ver projetos disponíveis
-          </Link>
+        <Link href="/meus-projetos" style={card}>
+          <h2>Meus projetos</h2>
 
-          <Link
-            href="/minhas-propostas"
-            className="bg-white text-black font-bold px-6 py-3 rounded-lg"
-          >
-            Minhas propostas
-          </Link>
+          <p>
+            Veja os projetos que você aceitou e está trabalhando.
+          </p>
+        </Link>
 
-          <Link
-            href="/convites"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Meus convites
-          </Link>
+        <Link href="/minhas-avaliacoes" style={card}>
+          <h2>Minhas avaliações</h2>
 
-          <Link
-            href="/notificacoes"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Notificações
-          </Link>
+          <p>
+            Veja suas avaliações recebidas.
+          </p>
+        </Link>
 
-          <Link
-            href="/perfil"
-            className="border border-white/20 px-6 py-3 rounded-lg"
-          >
-            Meu perfil
-          </Link>
+        <Link href="/perfil" style={card}>
+          <h2>Meu perfil</h2>
 
-          <Link
-            href="/planos"
-            className="bg-purple-500 text-white font-bold px-6 py-3 rounded-lg"
-          >
-            Alterar plano
-          </Link>
-        </div>
+          <p>
+            Atualize seus dados e portfólio.
+          </p>
+        </Link>
       </div>
     </main>
   );
 }
+
+const container = {
+  padding: 30,
+  maxWidth: 1200,
+  margin: "0 auto",
+};
+
+const titulo = {
+  fontSize: 34,
+  fontWeight: "bold",
+  marginBottom: 10,
+};
+
+const subtitulo = {
+  color: "#6b7280",
+  marginBottom: 30,
+};
+
+const grid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 20,
+};
+
+const card = {
+  display: "block",
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 14,
+  padding: 24,
+  textDecoration: "none",
+  color: "#111827",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+};
