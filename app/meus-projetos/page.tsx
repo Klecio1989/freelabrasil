@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function MeusProjetos() {
   const [usuario, setUsuario] = useState<any>(null);
-  const [projetos, setProjetos] = useState<any[]>([]);
+  const [projetosPublicados, setProjetosPublicados] = useState<any[]>([]);
+  const [projetosAndamento, setProjetosAndamento] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
 
@@ -25,16 +27,44 @@ export default function MeusProjetos() {
     }
 
     const user = JSON.parse(userLocal);
-
     setUsuario(user);
 
-    await carregarProjetos(user);
+    await carregarDados(user);
   }
 
-  async function carregarProjetos(user: any) {
+  async function carregarDados(user: any) {
     setLoading(true);
 
-    let query = supabase
+    if (user.tipo_usuario === "contratante") {
+      await carregarProjetosPublicados(user.id);
+      await carregarProjetosAndamentoContratante(user.id);
+    }
+
+    if (user.tipo_usuario === "freelancer") {
+      await carregarProjetosAndamentoFreela(user.id);
+    }
+
+    setLoading(false);
+  }
+
+  async function carregarProjetosPublicados(contratanteId: string) {
+    const { data, error } = await supabase
+      .from("projetos")
+      .select("*")
+      .eq("contratante_id", contratanteId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar projetos publicados:", error);
+      setProjetosPublicados([]);
+      return;
+    }
+
+    setProjetosPublicados(data || []);
+  }
+
+  async function carregarProjetosAndamentoContratante(contratanteId: string) {
+    const { data, error } = await supabase
       .from("projetos_andamento")
       .select(`
         id,
@@ -53,32 +83,52 @@ export default function MeusProjetos() {
           prazo
         )
       `)
+      .eq("contratante_id", contratanteId)
       .order("data_inicio", { ascending: false });
 
-    if (user.tipo_usuario === "freelancer") {
-      query = query.eq("freela_id", user.id);
+    if (error) {
+      console.error("Erro ao carregar projetos em andamento:", error);
+      setProjetosAndamento([]);
+      return;
     }
 
-    if (user.tipo_usuario === "contratante") {
-      query = query.eq("contratante_id", user.id);
-    }
+    setProjetosAndamento(data || []);
+  }
 
-    const { data, error } = await query;
+  async function carregarProjetosAndamentoFreela(freelaId: string) {
+    const { data, error } = await supabase
+      .from("projetos_andamento")
+      .select(`
+        id,
+        status,
+        data_inicio,
+        data_finalizacao,
+        data_confirmacao,
+        projeto_id,
+        freela_id,
+        contratante_id,
+        projetos (
+          id,
+          titulo,
+          descricao,
+          orcamento,
+          prazo
+        )
+      `)
+      .eq("freela_id", freelaId)
+      .order("data_inicio", { ascending: false });
 
     if (error) {
-      console.error("Erro ao carregar projetos:", error);
-      alert("Erro ao carregar projetos.");
-      setProjetos([]);
-    } else {
-      setProjetos(data || []);
+      console.error("Erro ao carregar projetos do freelancer:", error);
+      setProjetosAndamento([]);
+      return;
     }
 
-    setLoading(false);
+    setProjetosAndamento(data || []);
   }
 
   async function finalizarProjeto(item: any) {
     const confirmar = confirm("Deseja informar que finalizou este projeto?");
-
     if (!confirmar) return;
 
     setProcessando(item.id);
@@ -113,14 +163,11 @@ export default function MeusProjetos() {
     alert("Projeto enviado para confirmação do contratante.");
 
     setProcessando(null);
-    await carregarProjetos(usuario);
+    await carregarDados(usuario);
   }
 
   async function confirmarConclusao(item: any) {
-    const confirmar = confirm(
-      "Deseja confirmar a conclusão deste projeto?"
-    );
-
+    const confirmar = confirm("Deseja confirmar a conclusão deste projeto?");
     if (!confirmar) return;
 
     setProcessando(item.id);
@@ -155,21 +202,23 @@ export default function MeusProjetos() {
     alert("Projeto concluído com sucesso.");
 
     setProcessando(null);
-    await carregarProjetos(usuario);
+    await carregarDados(usuario);
   }
 
   function textoStatus(status: string) {
     if (status === "em_andamento") return "Em andamento";
     if (status === "finalizado_freela") return "Aguardando confirmação";
     if (status === "concluido") return "Concluído";
-    return status || "Sem status";
+    if (status === "aberto") return "Publicado";
+    if (status === "publicado") return "Publicado";
+    return status || "Publicado";
   }
 
   function corStatus(status: string) {
     if (status === "em_andamento") return "bg-blue-500";
     if (status === "finalizado_freela") return "bg-yellow-500";
     if (status === "concluido") return "bg-emerald-500";
-    return "bg-slate-500";
+    return "bg-purple-500";
   }
 
   if (loading) {
@@ -185,7 +234,6 @@ export default function MeusProjetos() {
       <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
         <section className="mx-auto max-w-6xl">
           <h1 className="text-5xl font-black">Meus projetos</h1>
-
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
             Você precisa estar logado.
           </div>
@@ -200,28 +248,116 @@ export default function MeusProjetos() {
         <h1 className="text-5xl font-black">Meus projetos</h1>
 
         <p className="mt-4 text-lg text-slate-300">
-          {usuario.tipo_usuario === "freelancer"
-            ? "Acompanhe os projetos que você aceitou e está trabalhando."
-            : "Acompanhe os projetos dos freelancers e confirme as conclusões."}
+          {usuario.tipo_usuario === "contratante"
+            ? "Acompanhe seus projetos publicados e os projetos em andamento."
+            : "Acompanhe os projetos que você aceitou e está trabalhando."}
         </p>
 
-        {projetos.length === 0 && (
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
-            Nenhum projeto encontrado.
+        {usuario.tipo_usuario === "contratante" && (
+          <>
+            <h2 className="mt-10 text-3xl font-black">Projetos publicados</h2>
+
+            {projetosPublicados.length === 0 && (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-6">
+                Nenhum projeto publicado encontrado.
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-6">
+              {projetosPublicados.map((projeto) => (
+                <div
+                  key={projeto.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-black">
+                        {projeto.titulo || "Projeto sem título"}
+                      </h3>
+
+                      <p className="mt-3 max-w-3xl text-slate-400">
+                        {projeto.descricao || "Sem descrição informada."}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-purple-500 px-4 py-2 text-sm font-black text-white">
+                      {textoStatus(projeto.status)}
+                    </span>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                      <p className="text-sm text-slate-400">Orçamento</p>
+                      <p className="mt-1 font-bold">
+                        {projeto.orcamento
+                          ? `R$ ${projeto.orcamento}`
+                          : "Não informado"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                      <p className="text-sm text-slate-400">Prazo</p>
+                      <p className="mt-1 font-bold">
+                        {projeto.prazo || "Não informado"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                      <p className="text-sm text-slate-400">Criado em</p>
+                      <p className="mt-1 font-bold">
+                        {projeto.created_at
+                          ? new Date(projeto.created_at).toLocaleDateString(
+                              "pt-BR"
+                            )
+                          : "Não informado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      href={`/projetos/${projeto.id}`}
+                      className="rounded-xl border border-white/10 px-5 py-3 font-bold text-white hover:bg-white/10"
+                    >
+                      Ver projeto
+                    </Link>
+
+                    <Link
+                      href="/propostas-recebidas"
+                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950 hover:bg-emerald-300"
+                    >
+                      Ver propostas
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <h2 className="mt-12 text-3xl font-black">
+          {usuario.tipo_usuario === "contratante"
+            ? "Projetos em andamento"
+            : "Trabalhos em andamento"}
+        </h2>
+
+        {projetosAndamento.length === 0 && (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-6">
+            Nenhum projeto em andamento encontrado.
           </div>
         )}
 
-        <div className="mt-8 grid gap-6">
-          {projetos.map((item) => (
+        <div className="mt-5 grid gap-6">
+          {projetosAndamento.map((item) => (
             <div
               key={item.id}
               className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-black">
+                  <h3 className="text-2xl font-black">
                     {item.projetos?.titulo || "Projeto sem título"}
-                  </h2>
+                  </h3>
 
                   <p className="mt-3 max-w-3xl text-slate-400">
                     {item.projetos?.descricao || "Sem descrição informada."}
@@ -265,6 +401,13 @@ export default function MeusProjetos() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href={`/chat?proposta_id=${item.projeto_id}`}
+                  className="rounded-xl border border-white/10 px-5 py-3 font-bold text-white hover:bg-white/10"
+                >
+                  Abrir chat
+                </Link>
+
                 {usuario.tipo_usuario === "freelancer" &&
                   item.status === "em_andamento" && (
                     <button
