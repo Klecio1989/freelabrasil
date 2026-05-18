@@ -30,8 +30,10 @@ function ChatContent() {
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [online, setOnline] = useState(false);
+  const [arquivo, setArquivo] = useState<File | null>(null);
 
   const mensagensRef = useRef<HTMLDivElement>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     carregarTudo();
@@ -143,7 +145,6 @@ function ChatContent() {
         .single();
 
       if (erroCriarChat) {
-        console.error("Erro ao criar chat:", erroCriarChat);
         alert("Erro ao criar chat: " + erroCriarChat.message);
         setLoading(false);
         return;
@@ -220,16 +221,59 @@ function ChatContent() {
     ];
 
     if (textoLower.includes("@")) return false;
-
-    if (termosBloqueados.some((termo) => textoLower.includes(termo))) {
-      return false;
-    }
+    if (termosBloqueados.some((termo) => textoLower.includes(termo))) return false;
 
     const numeros = texto.replace(/\D/g, "");
-
     if (numeros.length >= 8) return false;
 
     return true;
+  }
+
+  function selecionarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const limiteMb = 10;
+    const tamanhoMb = file.size / 1024 / 1024;
+
+    if (tamanhoMb > limiteMb) {
+      alert(`Arquivo muito grande. Limite máximo: ${limiteMb}MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setArquivo(file);
+  }
+
+  async function uploadArquivo(file: File) {
+    const extensao = file.name.split(".").pop();
+    const nomeLimpo = file.name
+      .replace(/\s+/g, "-")
+      .replace(/[^\w.-]/g, "")
+      .toLowerCase();
+
+    const caminho = `${chatId}/${Date.now()}-${nomeLimpo || `arquivo.${extensao}`}`;
+
+    const { error } = await supabase.storage
+      .from("chat-arquivos")
+      .upload(caminho, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabase.storage
+      .from("chat-arquivos")
+      .getPublicUrl(caminho);
+
+    return {
+      url: data.publicUrl,
+      nome: file.name,
+    };
   }
 
   async function enviarMensagem() {
@@ -243,9 +287,11 @@ function ChatContent() {
       return;
     }
 
-    if (!mensagem.trim()) return;
+    if (!mensagem.trim() && !arquivo) {
+      return;
+    }
 
-    if (!mensagemValida(mensagem)) {
+    if (mensagem.trim() && !mensagemValida(mensagem)) {
       alert(
         "Não é permitido compartilhar telefone, WhatsApp, PIX, email ou contato externo."
       );
@@ -255,14 +301,31 @@ function ChatContent() {
     try {
       setEnviando(true);
 
+      let arquivoUrl = null;
+      let arquivoNome = null;
+
+      if (arquivo) {
+        const uploaded = await uploadArquivo(arquivo);
+        arquivoUrl = uploaded.url;
+        arquivoNome = uploaded.nome;
+      }
+
       const textoMensagem = mensagem.trim();
+
       setMensagem("");
+      setArquivo(null);
+
+      if (inputArquivoRef.current) {
+        inputArquivoRef.current.value = "";
+      }
 
       const { error } = await supabase.from("mensagens").insert([
         {
           chat_id: chatId,
           remetente_id: usuario.id,
-          mensagem: textoMensagem,
+          mensagem: textoMensagem || null,
+          arquivo_url: arquivoUrl,
+          arquivo_nome: arquivoNome,
         },
       ]);
 
@@ -270,6 +333,9 @@ function ChatContent() {
         console.error(error);
         alert("Erro ao enviar mensagem.");
       }
+    } catch (error: any) {
+      console.error(error);
+      alert("Erro ao enviar anexo: " + (error?.message || "erro desconhecido"));
     } finally {
       setEnviando(false);
     }
@@ -382,9 +448,26 @@ function ChatContent() {
                         : "bg-white/10 text-white"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap leading-7">
-                      {m.mensagem}
-                    </p>
+                    {m.mensagem && (
+                      <p className="whitespace-pre-wrap leading-7">
+                        {m.mensagem}
+                      </p>
+                    )}
+
+                    {m.arquivo_url && (
+                      <a
+                        href={m.arquivo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`mt-3 block rounded-2xl border px-4 py-3 font-bold underline ${
+                          minhaMensagem
+                            ? "border-slate-900/20 bg-slate-950/10 text-slate-950"
+                            : "border-white/10 bg-slate-950/40 text-emerald-300"
+                        }`}
+                      >
+                        📎 {m.arquivo_nome || "Abrir anexo"}
+                      </a>
+                    )}
 
                     <div
                       className={`mt-3 flex items-center justify-end gap-2 text-xs ${
@@ -405,7 +488,38 @@ function ChatContent() {
           </div>
         </div>
 
+        {arquivo && (
+          <div className="mb-3 flex items-center justify-between rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-300">
+            <span>📎 {arquivo.name}</span>
+
+            <button
+              onClick={() => {
+                setArquivo(null);
+                if (inputArquivoRef.current) inputArquivoRef.current.value = "";
+              }}
+              className="font-bold text-red-300"
+            >
+              Remover
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-3">
+          <input
+            ref={inputArquivoRef}
+            type="file"
+            onChange={selecionarArquivo}
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={() => inputArquivoRef.current?.click()}
+            className="rounded-2xl border border-white/20 px-5 py-4 font-black hover:bg-white/5"
+          >
+            📎
+          </button>
+
           <textarea
             rows={2}
             value={mensagem}
