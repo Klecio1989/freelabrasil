@@ -60,7 +60,10 @@ export default function Navbar() {
   }
 
   async function marcarComoLida(id: string, link?: string) {
-    await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
+    await supabase
+      .from("notificacoes")
+      .update({ lida: true })
+      .eq("id", id);
 
     if (usuario?.id) {
       await carregarNotificacoes(usuario.id);
@@ -157,6 +160,7 @@ export default function Navbar() {
                   <div className="flex items-center justify-between border-b border-white/10 p-4">
                     <div>
                       <h3 className="font-black">Notificações</h3>
+
                       <p className="text-xs text-slate-400">
                         {naoLidas} não lida{naoLidas !== 1 ? "s" : ""}
                       </p>
@@ -224,7 +228,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* MENU USUÁRIO */}
+            {/* MENU */}
             <button
               onClick={() => {
                 setMenuAberto(!menuAberto);
@@ -244,12 +248,22 @@ export default function Navbar() {
             {menuAberto && (
               <div className="absolute right-0 top-14 w-64 rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
                 <div className="flex flex-col p-2 text-sm">
-                  <Link href="/perfil" className="px-4 py-3 hover:bg-white/5">
+                  <Link
+                    href="/perfil"
+                    className="px-4 py-3 hover:bg-white/5"
+                  >
                     Meu Perfil
                   </Link>
 
                   {usuario.tipo_usuario === "freelancer" && (
                     <>
+                      <Link
+                        href="/meus-projetos"
+                        className="px-4 py-3 hover:bg-white/5"
+                      >
+                        Meus projetos
+                      </Link>
+
                       <Link
                         href="/convites"
                         className="px-4 py-3 hover:bg-white/5"
@@ -268,10 +282,10 @@ export default function Navbar() {
 
                   {usuario.tipo_usuario === "contratante" && (
                     <Link
-                      href="/meus-projetos"
+                      href="/propostas-recebidas"
                       className="px-4 py-3 hover:bg-white/5"
                     >
-                      Meus projetos
+                      Propostas recebidas
                     </Link>
                   )}
 
