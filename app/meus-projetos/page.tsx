@@ -43,7 +43,10 @@ export default function MeusProjetos() {
 
     setUsuario(usuarioFinal);
 
+    console.log("USUARIO LOGADO:", usuarioFinal);
+
     await carregarProjetos(usuarioFinal);
+
   }
 
   async function carregarProjetos(user: any) {
