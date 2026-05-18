@@ -4,80 +4,47 @@ import Link from "next/link";
 
 export default function PainelFreelancer() {
   return (
-    <main style={container}>
-      <h1 style={titulo}>Painel do Freelancer</h1>
+    <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
+      <section className="mx-auto max-w-7xl">
+        <h1 className="text-4xl font-black">Painel do Freelancer</h1>
 
-      <p style={subtitulo}>
-        Gerencie seus projetos, propostas e acompanhe seus trabalhos.
-      </p>
+        <p className="mt-4 text-lg text-slate-300">
+          Gerencie seus projetos, propostas e acompanhe seus trabalhos.
+        </p>
 
-      <div style={grid}>
-        <Link href="/minhas-propostas" style={card}>
-          <h2>Minhas propostas</h2>
+        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Link href="/minhas-propostas" className={card}>
+            <h2 className="text-xl font-bold text-white">Minhas propostas</h2>
+            <p className="mt-3 text-slate-400">
+              Visualize todas as propostas enviadas para contratantes.
+            </p>
+          </Link>
 
-          <p>
-            Visualize todas as propostas enviadas.
-          </p>
-        </Link>
+          <Link href="/meus-projetos" className={card}>
+            <h2 className="text-xl font-bold text-white">Meus projetos</h2>
+            <p className="mt-3 text-slate-400">
+              Acompanhe os projetos que você aceitou e está trabalhando.
+            </p>
+          </Link>
 
-        <Link href="/meus-projetos" style={card}>
-          <h2>Meus projetos</h2>
+          <Link href="/minhas-avaliacoes" className={card}>
+            <h2 className="text-xl font-bold text-white">Minhas avaliações</h2>
+            <p className="mt-3 text-slate-400">
+              Veja as avaliações recebidas no seu perfil.
+            </p>
+          </Link>
 
-          <p>
-            Veja os projetos que você aceitou e está trabalhando.
-          </p>
-        </Link>
-
-        <Link href="/minhas-avaliacoes" style={card}>
-          <h2>Minhas avaliações</h2>
-
-          <p>
-            Veja suas avaliações recebidas.
-          </p>
-        </Link>
-
-        <Link href="/perfil" style={card}>
-          <h2>Meu perfil</h2>
-
-          <p>
-            Atualize seus dados e portfólio.
-          </p>
-        </Link>
-      </div>
+          <Link href="/perfil" className={card}>
+            <h2 className="text-xl font-bold text-white">Meu perfil</h2>
+            <p className="mt-3 text-slate-400">
+              Atualize seus dados e portfólio.
+            </p>
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }
 
-const container = {
-  padding: 30,
-  maxWidth: 1200,
-  margin: "0 auto",
-};
-
-const titulo = {
-  fontSize: 34,
-  fontWeight: "bold",
-  marginBottom: 10,
-};
-
-const subtitulo = {
-  color: "#6b7280",
-  marginBottom: 30,
-};
-
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 20,
-};
-
-const card = {
-  display: "block",
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 14,
-  padding: 24,
-  textDecoration: "none",
-  color: "#111827",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-};
+const card =
+  "rounded-2xl border border-white/10 bg-white/5 p-7 shadow-xl transition hover:-translate-y-1 hover:border-emerald-400/40 hover:bg-white/10";
