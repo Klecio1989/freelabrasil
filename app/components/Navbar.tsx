@@ -290,14 +290,24 @@ export default function Navbar() {
                   )}
 
                   {usuario.tipo_usuario === "contratante" && (
-                    <Link
-                      href="/propostas-recebidas"
-                      onClick={() => setMenuAberto(false)}
-                      className="px-4 py-3 hover:bg-white/5"
-                    >
-                      Propostas recebidas
-                    </Link>
-                  )}
+                      <>
+    <Link
+      href="/meus-projetos"
+      onClick={() => setMenuAberto(false)}
+      className="px-4 py-3 hover:bg-white/5"
+    >
+      Meus projetos
+    </Link>
+
+    <Link
+      href="/propostas-recebidas"
+      onClick={() => setMenuAberto(false)}
+      className="px-4 py-3 hover:bg-white/5"
+    >
+      Propostas recebidas
+    </Link>
+  </>
+)}
 
                   <Link
                     href="/dashboard-financeiro"
