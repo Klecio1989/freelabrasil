@@ -129,6 +129,7 @@ export default function MeusProjetos() {
 
   async function finalizarProjeto(item: any) {
     const confirmar = confirm("Deseja informar que finalizou este projeto?");
+
     if (!confirmar) return;
 
     setProcessando(item.id);
@@ -168,7 +169,26 @@ export default function MeusProjetos() {
 
   async function confirmarConclusao(item: any) {
     const confirmar = confirm("Deseja confirmar a conclusão deste projeto?");
+
     if (!confirmar) return;
+
+    const notaTexto = prompt("Digite uma nota de 1 a 5 para o freelancer:");
+
+    if (!notaTexto) return;
+
+    const nota = Number(notaTexto);
+
+    if (!nota || nota < 1 || nota > 5) {
+      alert("A nota precisa ser entre 1 e 5.");
+      return;
+    }
+
+    const comentario = prompt("Descreva sua experiência com o freelancer:");
+
+    if (!comentario || comentario.trim().length < 5) {
+      alert("Comentário obrigatório. Escreva pelo menos 5 caracteres.");
+      return;
+    }
 
     setProcessando(item.id);
 
@@ -187,6 +207,21 @@ export default function MeusProjetos() {
       return;
     }
 
+    const { error: avaliacaoError } = await supabase.from("avaliacoes").insert({
+      projeto_id: item.projeto_id,
+      projeto_andamento_id: item.id,
+      avaliador_id: usuario.id,
+      avaliado_id: item.freela_id,
+      nota,
+      comentario: comentario.trim(),
+      tipo: "freelancer",
+    });
+
+    if (avaliacaoError) {
+      console.error("Erro ao salvar avaliação:", avaliacaoError);
+      alert("Projeto concluído, mas houve erro ao salvar a avaliação.");
+    }
+
     if (item.freela_id) {
       await supabase.from("notificacoes").insert({
         usuario_id: item.freela_id,
@@ -199,7 +234,7 @@ export default function MeusProjetos() {
       });
     }
 
-    alert("Projeto concluído com sucesso.");
+    alert("Projeto concluído e avaliação enviada.");
 
     setProcessando(null);
     await carregarDados(usuario);
@@ -234,6 +269,7 @@ export default function MeusProjetos() {
       <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
         <section className="mx-auto max-w-6xl">
           <h1 className="text-5xl font-black">Meus projetos</h1>
+
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
             Você precisa estar logado.
           </div>
@@ -430,7 +466,7 @@ export default function MeusProjetos() {
                     >
                       {processando === item.id
                         ? "Confirmando..."
-                        : "Confirmar conclusão"}
+                        : "Confirmar conclusão e avaliar"}
                     </button>
                   )}
 
