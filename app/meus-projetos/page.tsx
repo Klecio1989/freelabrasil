@@ -127,6 +127,55 @@ export default function MeusProjetos() {
     setProjetosAndamento(data || []);
   }
 
+  async function atualizarMediaAvaliacoesFreelancer(freelaId: string) {
+    if (!freelaId) return;
+
+    const { data, error } = await supabase
+      .from("avaliacoes")
+      .select("nota")
+      .eq("avaliado_id", freelaId)
+      .eq("tipo", "freelancer");
+
+    if (error) {
+      console.error("Erro ao buscar avaliações:", error);
+      return;
+    }
+
+    const avaliacoes = data || [];
+    const total = avaliacoes.length;
+
+    if (total === 0) {
+      await supabase
+        .from("usuarios")
+        .update({
+          media_avaliacoes: 0,
+          total_avaliacoes: 0,
+        })
+        .eq("id", freelaId);
+
+      return;
+    }
+
+    const soma = avaliacoes.reduce(
+      (acc, atual) => acc + Number(atual.nota || 0),
+      0
+    );
+
+    const media = Number((soma / total).toFixed(1));
+
+    const { error: updateError } = await supabase
+      .from("usuarios")
+      .update({
+        media_avaliacoes: media,
+        total_avaliacoes: total,
+      })
+      .eq("id", freelaId);
+
+    if (updateError) {
+      console.error("Erro ao atualizar média do freelancer:", updateError);
+    }
+  }
+
   async function finalizarProjeto(item: any) {
     const confirmar = confirm("Deseja informar que finalizou este projeto?");
 
@@ -220,6 +269,8 @@ export default function MeusProjetos() {
     if (avaliacaoError) {
       console.error("Erro ao salvar avaliação:", avaliacaoError);
       alert("Projeto concluído, mas houve erro ao salvar a avaliação.");
+    } else {
+      await atualizarMediaAvaliacoesFreelancer(item.freela_id);
     }
 
     if (item.freela_id) {
