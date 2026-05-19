@@ -86,8 +86,14 @@ export default function FreelancerPublicPage() {
   }
 
   function corPlano(plano?: string) {
-    if (plano === "pro") return "border-purple-500/40 bg-purple-500/10";
-    if (plano === "plus") return "border-emerald-400/40 bg-emerald-400/10";
+    if (plano === "pro") {
+      return "border-purple-500/40 bg-purple-500/10";
+    }
+
+    if (plano === "plus") {
+      return "border-emerald-400/40 bg-emerald-400/10";
+    }
+
     return "border-white/10 bg-white/5";
   }
 
@@ -174,11 +180,11 @@ export default function FreelancerPublicPage() {
             freela.plano
           )}`}
         >
-          <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
+          <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
 
             <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-slate-900 p-6 text-center">
 
-              <div className="h-36 w-36 overflow-hidden rounded-full border border-white/10 bg-slate-800">
+              <div className="h-40 w-40 overflow-hidden rounded-full border-4 border-emerald-400/30 bg-slate-800 shadow-2xl">
                 {freela.foto_url ? (
                   <img
                     src={freela.foto_url}
@@ -192,7 +198,7 @@ export default function FreelancerPublicPage() {
                 )}
               </div>
 
-              <h1 className="mt-5 text-2xl font-black">
+              <h1 className="mt-6 text-3xl font-black">
                 {freela.nome}
               </h1>
 
@@ -200,52 +206,99 @@ export default function FreelancerPublicPage() {
                 {badgePlano(freela.plano)}
               </span>
 
-              <p className="mt-4 text-yellow-300">
-                ⭐ {media.toFixed(1)} ({avaliacoes.length} avaliações)
-              </p>
+              <div className="mt-5 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-5 py-4">
+                <p className="text-3xl font-black text-yellow-300">
+                  ⭐ {Number(freela.media_avaliacoes || media || 0).toFixed(1)}
+                </p>
 
-              <p className="mt-2 text-sm text-slate-400">
-                {freela.cidade || "Localização não informada"}
-              </p>
+                <p className="mt-1 text-sm text-slate-300">
+                  {freela.total_avaliacoes || avaliacoes.length} avaliações
+                </p>
+              </div>
+
+              <div className="mt-5 grid w-full gap-3">
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950 p-4">
+                  <p className="text-sm text-slate-400">
+                    Projetos concluídos
+                  </p>
+
+                  <p className="mt-1 text-2xl font-black text-emerald-300">
+                    {freela.projetos_concluidos || 0}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950 p-4">
+                  <p className="text-sm text-slate-400">
+                    Cidade
+                  </p>
+
+                  <p className="mt-1 font-bold">
+                    {freela.cidade || "Não informada"}
+                  </p>
+                </div>
+
+              </div>
 
               <Link
                 href={`/projetos/novo?freelancer_id=${freela.id}`}
-                className="mt-6 w-full rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
+                className="mt-6 w-full rounded-xl bg-emerald-400 px-5 py-4 text-center font-black text-slate-950 transition hover:bg-emerald-300"
               >
                 Convidar para projeto
               </Link>
 
               <button
                 onClick={() => setModalDenuncia(true)}
-                className="mt-3 w-full rounded-xl border border-red-400/20 bg-red-500/10 px-5 py-3 text-sm font-bold text-red-300"
+                className="mt-3 w-full rounded-xl border border-red-400/20 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-300"
               >
                 Denunciar usuário
               </button>
             </div>
 
-            <div>
-              <div className="rounded-3xl border border-white/10 bg-slate-900 p-6">
+            <div className="space-y-6">
 
-                <h2 className="text-3xl font-black">
-                  Sobre o freelancer
-                </h2>
+              <div className="rounded-3xl border border-white/10 bg-slate-900 p-7">
 
-                <p className="mt-4 leading-8 text-slate-300">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">
+                      Freelancer verificado
+                    </p>
+
+                    <h2 className="mt-2 text-4xl font-black">
+                      Sobre o freelancer
+                    </h2>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-3">
+                    <p className="text-sm text-slate-300">
+                      Reputação
+                    </p>
+
+                    <p className="text-xl font-black text-emerald-300">
+                      Excelente
+                    </p>
+                  </div>
+
+                </div>
+
+                <p className="mt-6 leading-8 text-slate-300">
                   {freela.descricao ||
                     "Este freelancer ainda não adicionou uma descrição profissional."}
                 </p>
 
-                <div className="mt-6">
-                  <h3 className="mb-3 text-lg font-black">
+                <div className="mt-8">
+                  <h3 className="mb-4 text-xl font-black">
                     Habilidades
                   </h3>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {separarTags(freela.habilidades).length > 0 ? (
                       separarTags(freela.habilidades).map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-300"
+                          className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300"
                         >
                           {tag}
                         </span>
@@ -262,18 +315,19 @@ export default function FreelancerPublicPage() {
                   <a
                     href={freela.portfolio_url}
                     target="_blank"
-                    className="mt-6 inline-block rounded-xl border border-white/20 px-5 py-3 font-bold text-white hover:bg-white/5"
+                    className="mt-8 inline-block rounded-xl border border-white/20 px-6 py-4 font-bold text-white hover:bg-white/5"
                   >
                     Abrir portfólio externo
                   </a>
                 )}
               </div>
+
             </div>
           </div>
         </div>
 
-        <div className="mt-10">
-          <h2 className="mb-5 text-3xl font-black">
+        <div className="mt-12">
+          <h2 className="mb-6 text-4xl font-black">
             Projetos do portfólio
           </h2>
 
@@ -282,38 +336,42 @@ export default function FreelancerPublicPage() {
               Nenhum projeto cadastrado no portfólio.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
               {portfolio.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-3xl border border-white/10 bg-slate-900 p-5"
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900"
                 >
                   {item.imagem_url && (
                     <img
                       src={item.imagem_url}
                       alt={item.titulo}
-                      className="h-44 w-full rounded-2xl object-cover"
+                      className="h-52 w-full object-cover"
                     />
                   )}
 
-                  <h3 className="mt-4 text-xl font-black">
-                    {item.titulo}
-                  </h3>
+                  <div className="p-5">
 
-                  <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-300">
-                    {item.descricao}
-                  </p>
+                    <h3 className="text-2xl font-black">
+                      {item.titulo}
+                    </h3>
 
-                  {item.link_url && (
-                    <a
-                      href={item.link_url}
-                      target="_blank"
-                      className="mt-4 inline-block rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950"
-                    >
-                      Abrir projeto
-                    </a>
-                  )}
+                    <p className="mt-3 line-clamp-4 text-sm leading-7 text-slate-300">
+                      {item.descricao}
+                    </p>
+
+                    {item.link_url && (
+                      <a
+                        href={item.link_url}
+                        target="_blank"
+                        className="mt-5 inline-block rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-slate-950"
+                      >
+                        Abrir projeto
+                      </a>
+                    )}
+
+                  </div>
                 </div>
               ))}
 
@@ -321,8 +379,8 @@ export default function FreelancerPublicPage() {
           )}
         </div>
 
-        <div className="mt-10">
-          <h2 className="mb-5 text-3xl font-black">
+        <div className="mt-12">
+          <h2 className="mb-6 text-4xl font-black">
             Avaliações
           </h2>
 
@@ -331,26 +389,34 @@ export default function FreelancerPublicPage() {
               Este freelancer ainda não recebeu avaliações.
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-5">
 
               {avaliacoes.map((avaliacao) => (
                 <div
                   key={avaliacao.id}
                   className="rounded-3xl border border-white/10 bg-white/5 p-6"
                 >
-                  <p className="text-yellow-300">
-                    {"⭐".repeat(Number(avaliacao.nota || 0))}
-                  </p>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
 
-                  <p className="mt-3 leading-7 text-slate-300">
-                    {avaliacao.comentario || "Sem comentário."}
-                  </p>
+                    <div>
+                      <p className="text-xl text-yellow-300">
+                        {"⭐".repeat(Number(avaliacao.nota || 0))}
+                      </p>
 
-                  {avaliacao.created_at && (
-                    <p className="mt-3 text-xs text-slate-500">
-                      {new Date(avaliacao.created_at).toLocaleString("pt-BR")}
-                    </p>
-                  )}
+                      <p className="mt-3 leading-7 text-slate-300">
+                        {avaliacao.comentario || "Sem comentário."}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-slate-400">
+                      {avaliacao.created_at
+                        ? new Date(avaliacao.created_at).toLocaleDateString(
+                            "pt-BR"
+                          )
+                        : ""}
+                    </div>
+
+                  </div>
                 </div>
               ))}
 
@@ -358,7 +424,6 @@ export default function FreelancerPublicPage() {
           )}
         </div>
 
-        {/* MODAL DENÚNCIA */}
         {modalDenuncia && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
 
