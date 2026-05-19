@@ -176,6 +176,35 @@ export default function MeusProjetos() {
     }
   }
 
+  async function atualizarProjetosConcluidosFreelancer(freelaId: string) {
+    if (!freelaId) return;
+
+    const { count, error } = await supabase
+      .from("projetos_andamento")
+      .select("*", { count: "exact", head: true })
+      .eq("freela_id", freelaId)
+      .eq("status", "concluido");
+
+    if (error) {
+      console.error("Erro ao contar projetos concluídos:", error);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("usuarios")
+      .update({
+        projetos_concluidos: count || 0,
+      })
+      .eq("id", freelaId);
+
+    if (updateError) {
+      console.error(
+        "Erro ao atualizar projetos concluídos do freelancer:",
+        updateError
+      );
+    }
+  }
+
   async function finalizarProjeto(item: any) {
     const confirmar = confirm("Deseja informar que finalizou este projeto?");
 
@@ -271,6 +300,7 @@ export default function MeusProjetos() {
       alert("Projeto concluído, mas houve erro ao salvar a avaliação.");
     } else {
       await atualizarMediaAvaliacoesFreelancer(item.freela_id);
+      await atualizarProjetosConcluidosFreelancer(item.freela_id);
     }
 
     if (item.freela_id) {
