@@ -1,448 +1,412 @@
-import Link from "next/link";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+export default function HomePage() {
+  const [freelancers, setFreelancers] = useState<any[]>([]);
+
+  useEffect(() => {
+    carregarFreelancers();
+  }, []);
+
+  async function carregarFreelancers() {
+    const { data } = await supabase
+      .from("usuarios")
+      .select("*")
+      .eq("tipo_usuario", "freelancer")
+      .order("media_avaliacoes", { ascending: false })
+      .limit(6);
+
+    setFreelancers(data || []);
+  }
+
+  function badgePlano(plano?: string) {
+    if (plano === "pro") return "👑 PRO";
+    if (plano === "plus") return "💎 PLUS";
+    return "FREE";
+  }
+
+  const categorias = [
+    "Power BI",
+    "Python",
+    "Excel",
+    "Automação",
+    "IA",
+    "Design",
+    "Sites",
+    "Apps",
+    "SQL",
+    "Dashboards",
+  ];
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white overflow-hidden">
+    <main className="min-h-screen bg-slate-950 text-white">
 
       {/* HERO */}
-      <section className="relative">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_40%)]" />
+      <section className="relative overflow-hidden border-b border-white/10">
 
-        <div className="relative mx-auto max-w-7xl px-6 py-24">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,#10b98122,transparent_40%)]" />
 
-          <div className="grid items-center gap-14 lg:grid-cols-2">
+        <div className="mx-auto max-w-7xl px-6 py-28">
 
-            {/* TEXTO */}
-            <div>
+          <div className="max-w-4xl">
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300">
-                🚀 Plataforma brasileira para freelancers
-              </div>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-5 py-2 text-sm font-bold text-emerald-300">
+              Plataforma brasileira de freelancers
+            </span>
 
-              {/* LOGO */}
-              <div className="mt-8">
-                <img
-                  src="/logo-freellabrasil.png"
-                  alt="FreellaBrasil"
-                  className="h-24 md:h-28"
-                />
-              </div>
+            <h1 className="mt-8 text-6xl font-black leading-tight">
+              Encontre freelancers especialistas para seu projeto
+            </h1>
 
-              <p className="mt-5 text-lg text-emerald-300 font-semibold">
-                Conecta talentos, realiza projetos.
-              </p>
+            <p className="mt-8 max-w-2xl text-xl leading-9 text-slate-300">
+              Contrate profissionais avaliados em tecnologia, design,
+              automação, Power BI, desenvolvimento web, apps e muito mais.
+            </p>
 
-              <h1 className="mt-6 text-5xl font-black leading-tight md:text-7xl">
-                Contrate especialistas ou trabalhe como freelancer.
-              </h1>
+            <div className="mt-10 flex flex-wrap gap-4">
 
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-300">
-                O FreellaBrasil conecta empresas e profissionais para projetos
-                em Excel, Power BI, Python, automações, dashboards,
-                design, desenvolvimento web e tecnologia.
-              </p>
+              <Link
+                href="/freelancers"
+                className="rounded-2xl bg-emerald-400 px-8 py-5 text-lg font-black text-slate-950 transition hover:bg-emerald-300"
+              >
+                Contratar freelancer
+              </Link>
 
-              <div className="mt-10 flex flex-wrap gap-4">
+              <Link
+                href="/cadastro"
+                className="rounded-2xl border border-white/10 bg-white/5 px-8 py-5 text-lg font-bold transition hover:bg-white/10"
+              >
+                Sou freelancer
+              </Link>
 
-                <Link
-                  href="/cadastro?tipo=contratante"
-                  className="rounded-2xl bg-emerald-400 px-7 py-4 font-black text-slate-950 transition hover:scale-[1.02]"
-                >
-                  Publicar projeto
-                </Link>
-
-                <Link
-                  href="/cadastro?tipo=freelancer"
-                  className="rounded-2xl border border-white/15 bg-white/5 px-7 py-4 font-bold text-white transition hover:bg-white/10"
-                >
-                  Criar perfil freelancer
-                </Link>
-              </div>
-
-              {/* MÉTRICAS */}
-              <div className="mt-14 flex flex-wrap gap-10">
-
-                <div>
-                  <p className="text-4xl font-black text-emerald-300">IA</p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Match inteligente
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-4xl font-black text-emerald-300">
-                    Seguro
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Pagamento protegido
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-4xl font-black text-emerald-300">
-                    Brasil
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Plataforma nacional
-                  </p>
-                </div>
-              </div>
             </div>
 
-            {/* CARD DIREITA */}
-            <div className="relative">
+          </div>
 
-              <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-emerald-400/20 blur-3xl" />
-              <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-purple-500/20 blur-3xl" />
+        </div>
+      </section>
 
-              <div className="relative rounded-[2rem] border border-white/10 bg-white/5 p-7 backdrop-blur">
+      {/* CATEGORIAS */}
+      <section className="mx-auto max-w-7xl px-6 py-20">
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400">
-                      Projeto em andamento
-                    </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
 
-                    <h3 className="mt-2 text-2xl font-black">
-                      Dashboard Power BI
-                    </h3>
+          <div>
+            <h2 className="text-4xl font-black">
+              Categorias populares
+            </h2>
+
+            <p className="mt-3 text-slate-400">
+              Encontre especialistas nas tecnologias mais procuradas.
+            </p>
+          </div>
+
+        </div>
+
+        <div className="mt-10 flex flex-wrap gap-4">
+
+          {categorias.map((categoria) => (
+            <div
+              key={categoria}
+              className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-lg font-bold transition hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-300"
+            >
+              {categoria}
+            </div>
+          ))}
+
+        </div>
+
+      </section>
+
+      {/* FREELANCERS DESTAQUE */}
+      <section className="border-y border-white/10 bg-white/[0.02]">
+
+        <div className="mx-auto max-w-7xl px-6 py-20">
+
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+
+            <div>
+              <h2 className="text-4xl font-black">
+                Freelancers em destaque
+              </h2>
+
+              <p className="mt-3 text-slate-400">
+                Profissionais com melhor reputação na plataforma.
+              </p>
+            </div>
+
+            <Link
+              href="/freelancers"
+              className="rounded-2xl border border-white/10 px-6 py-4 font-bold transition hover:bg-white/5"
+            >
+              Ver todos
+            </Link>
+
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+
+            {freelancers.map((freela) => (
+              <div
+                key={freela.id}
+                className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl transition hover:-translate-y-1"
+              >
+
+                <div className="flex items-start gap-4">
+
+                  <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10 bg-slate-800">
+                    {freela.foto_url ? (
+                      <img
+                        src={freela.foto_url}
+                        alt={freela.nome}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-3xl font-black">
+                        {freela.nome?.charAt(0)?.toUpperCase() || "F"}
+                      </div>
+                    )}
                   </div>
 
-                  <span className="rounded-full bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-300">
-                    IA Match
-                  </span>
+                  <div className="flex-1">
+
+                    <div className="flex flex-wrap items-center gap-2">
+
+                      <h3 className="text-2xl font-black">
+                        {freela.nome}
+                      </h3>
+
+                      <span className="rounded-full border border-white/10 bg-slate-950 px-3 py-1 text-xs font-black">
+                        {badgePlano(freela.plano)}
+                      </span>
+
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+
+                      <div className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-2 font-black text-yellow-300">
+                        ⭐ {Number(freela.media_avaliacoes || 0).toFixed(1)}
+                      </div>
+
+                      <div className="text-sm text-slate-400">
+                        {freela.total_avaliacoes || 0} avaliações
+                      </div>
+
+                    </div>
+
+                  </div>
+
                 </div>
 
-                <div className="mt-8 space-y-4">
+                <div className="mt-5 grid grid-cols-2 gap-4">
 
-                  <FreelaCard
-                    nome="Carlos Mendes"
-                    skill="Power BI • Excel • Automação"
-                    nota="5.0"
-                    plano="PRO"
-                  />
+                  <div className="rounded-2xl border border-white/10 bg-slate-950 p-4">
 
-                  <FreelaCard
-                    nome="Ana Souza"
-                    skill="Python • Dashboards • Dados"
-                    nota="4.9"
-                    plano="PLUS"
-                  />
+                    <p className="text-sm text-slate-400">
+                      Projetos concluídos
+                    </p>
 
-                  <FreelaCard
-                    nome="Juliana Lima"
-                    skill="Design • UI/UX • Web"
-                    nota="4.8"
-                    plano="PLUS"
-                  />
+                    <p className="mt-1 text-2xl font-black text-emerald-300">
+                      {freela.projetos_concluidos || 0}
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-slate-950 p-4">
+
+                    <p className="text-sm text-slate-400">
+                      Cidade
+                    </p>
+
+                    <p className="mt-1 font-bold">
+                      {freela.cidade || "Brasil"}
+                    </p>
+
+                  </div>
 
                 </div>
 
-                <button className="mt-8 w-full rounded-2xl bg-emerald-400 px-6 py-4 font-black text-slate-950">
-                  Encontrar freelancers
-                </button>
+                <p className="mt-5 line-clamp-4 leading-7 text-slate-300">
+                  {freela.descricao ||
+                    "Freelancer especialista disponível para novos projetos."}
+                </p>
+
+                <Link
+                  href={`/freelancer/${freela.id}`}
+                  className="mt-6 block rounded-2xl bg-emerald-400 px-5 py-4 text-center font-black text-slate-950 transition hover:bg-emerald-300"
+                >
+                  Ver perfil completo
+                </Link>
+
               </div>
-            </div>
+            ))}
+
           </div>
+
         </div>
+
       </section>
 
       {/* COMO FUNCIONA */}
-      <section
-        id="como-funciona"
-        className="border-t border-white/10 bg-slate-900/60"
-      >
-        <div className="mx-auto max-w-7xl px-6 py-24">
+      <section className="mx-auto max-w-7xl px-6 py-20">
 
-          <div className="text-center">
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300">
-              Como funciona
-            </span>
+        <div className="text-center">
 
-            <h2 className="mt-6 text-5xl font-black">
-              Simples, rápido e seguro.
-            </h2>
+          <h2 className="text-5xl font-black">
+            Como funciona
+          </h2>
 
-            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-              Contratantes encontram especialistas rapidamente e freelancers
-              recebem projetos alinhados ao seu perfil através da IA.
+          <p className="mt-4 text-lg text-slate-400">
+            Simples, rápido e seguro.
+          </p>
+
+        </div>
+
+        <div className="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="text-5xl font-black text-emerald-300">
+              1
+            </div>
+
+            <h3 className="mt-6 text-2xl font-black">
+              Publique seu projeto
+            </h3>
+
+            <p className="mt-4 leading-8 text-slate-300">
+              Descreva sua necessidade e receba propostas rapidamente.
             </p>
           </div>
 
-          <div className="mt-16 grid gap-6 md:grid-cols-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="text-5xl font-black text-emerald-300">
+              2
+            </div>
 
-            <Card
-              numero="1"
-              titulo="Cadastre-se"
-              texto="Crie seu perfil como freelancer ou publique seu projeto como contratante."
-            />
+            <h3 className="mt-6 text-2xl font-black">
+              Receba propostas
+            </h3>
 
-            <Card
-              numero="2"
-              titulo="Conecte-se"
-              texto="A IA sugere freelancers ideais para cada projeto publicado."
-            />
-
-            <Card
-              numero="3"
-              titulo="Execute"
-              texto="Converse, envie propostas e trabalhe com segurança dentro da plataforma."
-            />
-
-            <Card
-              numero="4"
-              titulo="Finalize"
-              texto="Avalie, libere pagamento e continue construindo reputação."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ÁREAS */}
-      <section className="border-t border-white/10">
-        <div className="mx-auto max-w-7xl px-6 py-24">
-
-          <div className="text-center">
-            <h2 className="text-5xl font-black">
-              Áreas mais procuradas
-            </h2>
-
-            <p className="mt-6 text-lg text-slate-300">
-              Encontre profissionais especializados em diversas áreas.
+            <p className="mt-4 leading-8 text-slate-300">
+              Freelancers qualificados irão enviar propostas para você.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="text-5xl font-black text-emerald-300">
+              3
+            </div>
 
-            <AreaCard titulo="Power BI" />
-            <AreaCard titulo="Excel" />
-            <AreaCard titulo="Python" />
-            <AreaCard titulo="Dashboards" />
-            <AreaCard titulo="Automação" />
-            <AreaCard titulo="Design" />
-            <AreaCard titulo="Web & Software" />
-            <AreaCard titulo="Consultoria" />
+            <h3 className="mt-6 text-2xl font-black">
+              Converse no chat
+            </h3>
 
+            <p className="mt-4 leading-8 text-slate-300">
+              Negocie, envie arquivos e acompanhe o projeto.
+            </p>
           </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="text-5xl font-black text-emerald-300">
+              4
+            </div>
+
+            <h3 className="mt-6 text-2xl font-black">
+              Conclua com segurança
+            </h3>
+
+            <p className="mt-4 leading-8 text-slate-300">
+              Avalie freelancers e construa reputação na plataforma.
+            </p>
+          </div>
+
         </div>
+
       </section>
 
-      {/* DIFERENCIAL */}
-      <section className="border-t border-white/10 bg-slate-900/50">
-        <div className="mx-auto max-w-7xl px-6 py-24">
+      {/* ESTATISTICAS */}
+      <section className="border-y border-white/10 bg-white/[0.02]">
 
-          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-20 md:grid-cols-2 xl:grid-cols-4">
 
-            <div>
-              <span className="rounded-full border border-purple-400/20 bg-purple-400/10 px-4 py-2 text-sm font-semibold text-purple-300">
-                IA integrada
-              </span>
+          <div className="rounded-3xl border border-white/10 bg-slate-900 p-8 text-center">
+            <p className="text-5xl font-black text-emerald-300">
+              +100
+            </p>
 
-              <h2 className="mt-6 text-5xl font-black">
-                Match inteligente para encontrar profissionais ideais.
-              </h2>
-
-              <p className="mt-8 text-lg leading-8 text-slate-300">
-                A plataforma utiliza inteligência artificial para conectar
-                contratantes aos freelancers mais compatíveis com o projeto,
-                aumentando a taxa de sucesso e reduzindo o tempo de contratação.
-              </p>
-
-              <div className="mt-10 flex flex-wrap gap-4">
-                <span className="rounded-full bg-white/5 px-4 py-3 text-sm">
-                  🧠 Match IA
-                </span>
-
-                <span className="rounded-full bg-white/5 px-4 py-3 text-sm">
-                  💰 Sugestão de preço
-                </span>
-
-                <span className="rounded-full bg-white/5 px-4 py-3 text-sm">
-                  ✍ IA para propostas
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5">
-                <p className="text-sm text-emerald-300">
-                  Projeto analisado pela IA
-                </p>
-
-                <h3 className="mt-3 text-2xl font-black">
-                  Automação de relatórios Excel
-                </h3>
-
-                <p className="mt-4 leading-7 text-slate-300">
-                  IA encontrou freelancers especializados em Power Query,
-                  VBA e automação de dashboards.
-                </p>
-              </div>
-
-              <div className="mt-6 space-y-4">
-
-                <MiniCard
-                  nome="Marcos Silva"
-                  skill="Excel • VBA • Power Query"
-                />
-
-                <MiniCard
-                  nome="Fernanda Costa"
-                  skill="Power BI • Python • Dados"
-                />
-
-                <MiniCard
-                  nome="Rafael Lima"
-                  skill="Automação • Dashboards"
-                />
-
-              </div>
-            </div>
+            <p className="mt-3 text-lg text-slate-400">
+              Freelancers
+            </p>
           </div>
+
+          <div className="rounded-3xl border border-white/10 bg-slate-900 p-8 text-center">
+            <p className="text-5xl font-black text-emerald-300">
+              +300
+            </p>
+
+            <p className="mt-3 text-lg text-slate-400">
+              Projetos
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-slate-900 p-8 text-center">
+            <p className="text-5xl font-black text-emerald-300">
+              4.9
+            </p>
+
+            <p className="mt-3 text-lg text-slate-400">
+              Média avaliações
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-slate-900 p-8 text-center">
+            <p className="text-5xl font-black text-emerald-300">
+              24h
+            </p>
+
+            <p className="mt-3 text-lg text-slate-400">
+              Tempo médio resposta
+            </p>
+          </div>
+
         </div>
+
       </section>
 
       {/* CTA FINAL */}
-      <section className="border-t border-white/10">
-        <div className="mx-auto max-w-5xl px-6 py-24 text-center">
+      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
 
-          <h2 className="text-5xl font-black">
-            Comece agora no FreellaBrasil
-          </h2>
+        <h2 className="text-5xl font-black">
+          Comece agora gratuitamente
+        </h2>
 
-          <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Crie seu perfil freelancer ou publique seu projeto e encontre
-            especialistas com ajuda da inteligência artificial.
-          </p>
+        <p className="mt-6 text-xl leading-9 text-slate-300">
+          Publique projetos, encontre especialistas e desenvolva seu negócio com o FreelaBrasil.
+        </p>
 
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
 
-            <Link
-              href="/cadastro?tipo=freelancer"
-              className="rounded-2xl bg-emerald-400 px-7 py-4 font-black text-slate-950"
-            >
-              Quero ser freelancer
-            </Link>
+          <Link
+            href="/cadastro"
+            className="rounded-2xl bg-emerald-400 px-8 py-5 text-lg font-black text-slate-950 transition hover:bg-emerald-300"
+          >
+            Criar conta grátis
+          </Link>
 
-            <Link
-              href="/cadastro?tipo=contratante"
-              className="rounded-2xl border border-white/15 bg-white/5 px-7 py-4 font-bold text-white"
-            >
-              Quero contratar
-            </Link>
+          <Link
+            href="/freelancers"
+            className="rounded-2xl border border-white/10 bg-white/5 px-8 py-5 text-lg font-bold transition hover:bg-white/10"
+          >
+            Explorar freelancers
+          </Link>
 
-          </div>
         </div>
+
       </section>
 
     </main>
-  );
-}
-
-function Card({
-  numero,
-  titulo,
-  texto,
-}: {
-  numero: string;
-  titulo: string;
-  texto: string;
-}) {
-  return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/5 p-7 text-center transition hover:-translate-y-1 hover:bg-white/10">
-
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400 text-2xl font-black text-slate-950">
-        {numero}
-      </div>
-
-      <h3 className="mt-6 text-2xl font-black">
-        {titulo}
-      </h3>
-
-      <p className="mt-4 leading-7 text-slate-400">
-        {texto}
-      </p>
-    </div>
-  );
-}
-
-function FreelaCard({
-  nome,
-  skill,
-  nota,
-  plano,
-}: {
-  nome: string;
-  skill: string;
-  nota: string;
-  plano: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
-
-      <div className="flex items-center justify-between">
-
-        <div>
-          <h4 className="font-black">
-            {nome}
-          </h4>
-
-          <p className="mt-1 text-sm text-slate-400">
-            {skill}
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="text-yellow-300">
-            ⭐ {nota}
-          </p>
-
-          <span className="mt-1 inline-block rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] font-bold text-emerald-300">
-            {plano}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AreaCard({ titulo }: { titulo: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center transition hover:bg-white/10 hover:-translate-y-1">
-
-      <h3 className="text-xl font-black">
-        {titulo}
-      </h3>
-    </div>
-  );
-}
-
-function MiniCard({
-  nome,
-  skill,
-}: {
-  nome: string;
-  skill: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
-
-      <div className="flex items-center justify-between">
-
-        <div>
-          <h4 className="font-black">
-            {nome}
-          </h4>
-
-          <p className="mt-1 text-sm text-slate-400">
-            {skill}
-          </p>
-        </div>
-
-        <span className="rounded-full bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-300">
-          Match IA
-        </span>
-      </div>
-    </div>
   );
 }
