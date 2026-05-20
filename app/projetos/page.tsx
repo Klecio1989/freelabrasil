@@ -30,6 +30,7 @@ export default function ProjetosPage() {
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtroArea, setFiltroArea] = useState("todas");
+  const [validando, setValidando] = useState<string | null>(null);
 
   useEffect(() => {
     carregarProjetos();
@@ -100,6 +101,68 @@ export default function ProjetosPage() {
     setCarregando(false);
   }
 
+  async function validarEnvioProposta(projetoId: string) {
+    if (!usuario) {
+      alert("Faça login para enviar proposta.");
+      window.location.href = "/login";
+      return;
+    }
+
+    if (usuario.tipo_usuario !== "freelancer") {
+      alert("Apenas freelancers podem enviar propostas.");
+      return;
+    }
+
+    const plano = usuario.plano || "gratuito";
+
+    if (plano === "pro") {
+      window.location.href = `/propostas/nova?projeto_id=${projetoId}`;
+      return;
+    }
+
+    setValidando(projetoId);
+
+    let query = supabase
+      .from("propostas")
+      .select("*", {
+        count: "exact",
+        head: true,
+      })
+      .eq("freelancer_id", usuario.id);
+
+    if (plano === "plus") {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      query = query.gte("created_at", hoje.toISOString());
+    }
+
+    const { count, error } = await query;
+
+    setValidando(null);
+
+    if (error) {
+      console.error("Erro ao validar limite de propostas:", error);
+      alert("Erro ao validar limite do plano.");
+      return;
+    }
+
+    const total = count || 0;
+
+    if (plano === "gratuito" && total >= 2) {
+      alert("Plano gratuito permite apenas 2 propostas. Faça upgrade para PLUS ou PRO.");
+      window.location.href = "/planos";
+      return;
+    }
+
+    if (plano === "plus" && total >= 10) {
+      alert("Plano PLUS permite até 10 propostas por dia.");
+      return;
+    }
+
+    window.location.href = `/propostas/nova?projeto_id=${projetoId}`;
+  }
+
   const areas = useMemo(() => {
     const lista = projetos
       .map((p) => p.area)
@@ -136,11 +199,6 @@ export default function ProjetosPage() {
       return bateBusca && bateArea;
     });
   }, [projetos, busca, filtroArea]);
-
-  function sair() {
-    localStorage.removeItem("freelabrasil_usuario");
-    window.location.href = "/login";
-  }
 
   function limparFiltros() {
     setBusca("");
@@ -362,12 +420,15 @@ export default function ProjetosPage() {
 
                   <div className="flex min-w-[230px] flex-col gap-3">
                     {usuario?.tipo_usuario === "freelancer" ? (
-                      <Link
-                        href={`/propostas/nova?projeto_id=${projeto.id}`}
-                        className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02]"
+                      <button
+                        onClick={() => validarEnvioProposta(projeto.id)}
+                        disabled={validando === projeto.id}
+                        className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-bold text-slate-950 transition hover:scale-[1.02] disabled:opacity-60"
                       >
-                        Enviar proposta
-                      </Link>
+                        {validando === projeto.id
+                          ? "Validando..."
+                          : "Enviar proposta"}
+                      </button>
                     ) : (
                       <button
                         disabled
