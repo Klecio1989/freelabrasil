@@ -1,302 +1,199 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-export default function AdminSaquesPage() {
+export default function SaquesPage() {
   const [usuario, setUsuario] = useState<any>(null);
   const [saques, setSaques] = useState<any[]>([]);
-  const [usuariosMap, setUsuariosMap] = useState<Record<string, any>>({});
+  const [valor, setValor] = useState("");
+  const [chavePix, setChavePix] = useState("");
+  const [tipoPix, setTipoPix] = useState("cpf");
   const [loading, setLoading] = useState(true);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     carregar();
   }, []);
 
   async function carregar() {
-    setLoading(true);
+    const userLocal = localStorage.getItem("freelabrasil_usuario");
 
-    const user = localStorage.getItem("freelabrasil_usuario");
-
-    if (!user) {
+    if (!userLocal) {
       setLoading(false);
       return;
     }
 
-    const parsed = JSON.parse(user);
-    setUsuario(parsed);
+    const user = JSON.parse(userLocal);
+    setUsuario(user);
 
-    if (parsed.role !== "admin") {
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("saques")
       .select("*")
+      .eq("usuario_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(error);
-      alert("Erro ao carregar saques.");
-      setLoading(false);
-      return;
-    }
-
-    const lista = data || [];
-    setSaques(lista);
-
-    const freelaIds = [
-      ...new Set(lista.map((s: any) => s.freela_id).filter(Boolean)),
-    ];
-
-    if (freelaIds.length > 0) {
-      const { data: usuariosData } = await supabase
-        .from("usuarios")
-        .select("id,nome,email,status_conta")
-        .in("id", freelaIds);
-
-      const mapa = Object.fromEntries(
-        (usuariosData || []).map((u: any) => [u.id, u])
-      );
-
-      setUsuariosMap(mapa);
-    } else {
-      setUsuariosMap({});
-    }
-
+    setSaques(data || []);
     setLoading(false);
   }
 
-  async function atualizarStatus(id: string, status: "pago" | "cancelado") {
-    const confirmar = confirm(
-      status === "pago"
-        ? "Confirma que este saque foi pago via PIX?"
-        : "Confirma o cancelamento deste saque?"
-    );
-
-    if (!confirmar) return;
-
-    const payload: any = { status };
-
-    if (status === "pago") {
-      payload.pago_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .from("saques")
-      .update(payload)
-      .eq("id", id);
-
-    if (error) {
-      console.error(error);
-      alert("Erro ao atualizar saque.");
+  async function solicitarSaque() {
+    if (!usuario?.id) {
+      alert("Você precisa estar logado.");
       return;
     }
 
-    alert(status === "pago" ? "Saque marcado como pago." : "Saque cancelado.");
+    const valorNumerico = Number(valor.replace(",", "."));
+
+    if (!valorNumerico || valorNumerico <= 0) {
+      alert("Informe um valor válido.");
+      return;
+    }
+
+    if (!chavePix.trim()) {
+      alert("Informe sua chave PIX.");
+      return;
+    }
+
+    setEnviando(true);
+
+    const { error } = await supabase.from("saques").insert({
+      usuario_id: usuario.id,
+      valor: valorNumerico,
+      chave_pix: chavePix.trim(),
+      tipo_pix: tipoPix,
+      status: "pendente",
+    });
+
+    setEnviando(false);
+
+    if (error) {
+      console.error(error);
+      alert("Erro ao solicitar saque.");
+      return;
+    }
+
+    alert("Solicitação de saque enviada.");
+    setValor("");
+    setChavePix("");
+    setTipoPix("cpf");
     carregar();
   }
 
-  function formatar(valor: number) {
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
+  function statusCor(status: string) {
+    if (status === "aprovado") return "text-emerald-300";
+    if (status === "reprovado") return "text-red-300";
+    return "text-yellow-300";
   }
-
-  function corStatus(status: string) {
-    if (status === "pago")
-      return "text-emerald-300 bg-emerald-400/10 border-emerald-400/20";
-
-    if (status === "cancelado")
-      return "text-red-300 bg-red-400/10 border-red-400/20";
-
-    return "text-yellow-300 bg-yellow-400/10 border-yellow-400/20";
-  }
-
-  const pendentes = saques.filter((s) => s.status === "pendente").length;
-  const pagos = saques.filter((s) => s.status === "pago").length;
-  const cancelados = saques.filter((s) => s.status === "cancelado").length;
 
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Carregando...
-      </main>
-    );
-  }
-
-  if (!usuario) {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Você precisa estar logado.
-      </main>
-    );
-  }
-
-  if (usuario.role !== "admin") {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
-          <h1 className="text-3xl font-black text-red-300">Acesso negado</h1>
-          <p className="mt-3 text-slate-300">
-            Esta área é exclusiva para administradores.
-          </p>
-
-          <Link
-            href="/"
-            className="mt-6 inline-block rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
-          >
-            Voltar ao início
-          </Link>
-        </div>
+        Carregando saques...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <section className="mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-black">Admin - Saques</h1>
-            <p className="mt-3 text-slate-400">
-              Aprove, cancele e acompanhe solicitações de saque dos freelancers.
-            </p>
+    <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
+      <section className="mx-auto max-w-5xl">
+        <h1 className="text-5xl font-black">Saques</h1>
+
+        <p className="mt-4 text-slate-300">
+          Solicite o recebimento dos seus ganhos via PIX.
+        </p>
+
+        <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-8">
+          <h2 className="text-3xl font-black">Solicitar saque</h2>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <input
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder="Valor do saque"
+              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 outline-none"
+            />
+
+            <select
+              value={tipoPix}
+              onChange={(e) => setTipoPix(e.target.value)}
+              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 outline-none"
+            >
+              <option value="cpf">CPF</option>
+              <option value="email">E-mail</option>
+              <option value="telefone">Telefone</option>
+              <option value="aleatoria">Chave aleatória</option>
+            </select>
+
+            <input
+              value={chavePix}
+              onChange={(e) => setChavePix(e.target.value)}
+              placeholder="Chave PIX"
+              className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 outline-none"
+            />
           </div>
 
-          <Link
-            href="/admin"
-            className="rounded-xl border border-white/20 px-5 py-3 font-bold"
+          <button
+            onClick={solicitarSaque}
+            disabled={enviando}
+            className="mt-6 rounded-xl bg-emerald-400 px-6 py-3 font-black text-slate-950 disabled:opacity-60"
           >
-            Voltar
-          </Link>
+            {enviando ? "Enviando..." : "Solicitar saque"}
+          </button>
         </div>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
-          <Card titulo="Total" valor={String(saques.length)} />
-          <Card titulo="Pendentes" valor={String(pendentes)} amarelo />
-          <Card titulo="Pagos" valor={String(pagos)} verde />
-          <Card titulo="Cancelados" valor={String(cancelados)} vermelho />
-        </div>
+        <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-8">
+          <h2 className="text-3xl font-black">Histórico de saques</h2>
 
-        {saques.length === 0 && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            Nenhum saque solicitado.
-          </div>
-        )}
+          {saques.length === 0 && (
+            <p className="mt-5 text-slate-400">
+              Nenhuma solicitação de saque encontrada.
+            </p>
+          )}
 
-        <div className="grid gap-5">
-          {saques.map((s) => {
-            const freela = usuariosMap[s.freela_id];
-
-            return (
+          <div className="mt-6 grid gap-4">
+            {saques.map((saque) => (
               <div
-                key={s.id}
-                className="rounded-3xl border border-white/10 bg-slate-900 p-6"
+                key={saque.id}
+                className="rounded-2xl border border-white/10 bg-slate-900 p-5"
               >
-                <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-black">
-                      {formatar(Number(s.valor || 0))}
-                    </h2>
-
-                    <p className="mt-2 text-sm text-slate-300">
-                      Freelancer:{" "}
-                      <span className="font-bold">
-                        {freela?.nome || "Não localizado"}
-                      </span>
+                    <p className="text-2xl font-black">
+                      {Number(saque.valor || 0).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-400">
-                      Email: {freela?.email || "-"}
+                    <p className="mt-2 text-sm text-slate-400">
+                      PIX: {saque.tipo_pix} — {saque.chave_pix}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-400">
-                      Freela ID: {s.freela_id}
-                    </p>
-
-                    <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-                      <p className="text-sm text-emerald-200">Chave PIX</p>
-                      <p className="mt-1 break-all text-lg font-black text-emerald-300">
-                        {s.chave_pix || "Não informada"}
-                      </p>
-                    </div>
-
-                    {s.created_at && (
-                      <p className="mt-4 text-sm text-slate-500">
-                        Solicitado em{" "}
-                        {new Date(s.created_at).toLocaleString("pt-BR")}
+                    {saque.observacao && (
+                      <p className="mt-2 text-sm text-slate-400">
+                        Obs: {saque.observacao}
                       </p>
                     )}
                   </div>
 
-                  <span
-                    className={`rounded-full border px-4 py-2 text-sm font-bold ${corStatus(
-                      s.status
-                    )}`}
-                  >
-                    {s.status || "pendente"}
-                  </span>
-                </div>
+                  <div className="text-right">
+                    <p className={`font-black ${statusCor(saque.status)}`}>
+                      {saque.status?.toUpperCase()}
+                    </p>
 
-                {s.status === "pendente" && (
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => atualizarStatus(s.id, "pago")}
-                      className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
-                    >
-                      Marcar como pago
-                    </button>
-
-                    <button
-                      onClick={() => atualizarStatus(s.id, "cancelado")}
-                      className="rounded-xl border border-red-400 px-5 py-3 font-bold text-red-300"
-                    >
-                      Cancelar saque
-                    </button>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {saque.created_at
+                        ? new Date(saque.created_at).toLocaleString("pt-BR")
+                        : ""}
+                    </p>
                   </div>
-                )}
-
-                {s.status === "pago" && s.pago_at && (
-                  <p className="mt-4 font-bold text-emerald-300">
-                    Pago em {new Date(s.pago_at).toLocaleString("pt-BR")}
-                  </p>
-                )}
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </section>
     </main>
-  );
-}
-
-function Card({
-  titulo,
-  valor,
-  verde,
-  amarelo,
-  vermelho,
-}: {
-  titulo: string;
-  valor: string;
-  verde?: boolean;
-  amarelo?: boolean;
-  vermelho?: boolean;
-}) {
-  let classe = "border-white/10 bg-white/5";
-
-  if (verde) classe = "border-emerald-400/30 bg-emerald-400/10";
-  if (amarelo) classe = "border-yellow-400/30 bg-yellow-400/10";
-  if (vermelho) classe = "border-red-400/30 bg-red-400/10";
-
-  return (
-    <div className={`rounded-2xl border p-5 ${classe}`}>
-      <p className="text-sm text-slate-400">{titulo}</p>
-      <p className="mt-2 text-2xl font-black">{valor}</p>
-    </div>
   );
 }
