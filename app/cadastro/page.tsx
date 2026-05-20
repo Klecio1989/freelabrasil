@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import { enviarEmail } from "../lib/enviarEmail";
 import Link from "next/link";
 
 export default function CadastroPage() {
@@ -130,6 +131,9 @@ export default function CadastroPage() {
         tipo_usuario: tipoUsuario,
         plano: "gratuito",
         ativo: true,
+        banido: false,
+        admin: false,
+        motivo_banimento: null,
         email_verificado: true,
         aceite_termos: true,
         aceite_comissao: true,
@@ -171,6 +175,22 @@ export default function CadastroPage() {
         alert("Erro ao cadastrar usuário.");
         return;
       }
+
+      await enviarEmail({
+        para: emailNormalizado,
+        assunto: "Bem-vindo ao FreellaBrasil 🚀",
+        titulo: `Olá ${nome.trim()}, sua conta foi criada com sucesso.`,
+        mensagem: `
+          Seja bem-vindo ao FreellaBrasil.
+
+          Agora você já pode criar projetos, enviar propostas, contratar freelancers,
+          receber pagamentos e construir sua reputação dentro da plataforma.
+
+          Complete seu perfil para aumentar suas chances de fechar projetos.
+        `,
+        botaoTexto: "Acessar plataforma",
+        botaoLink: "https://www.freellabrasil.com.br/login",
+      });
 
       alert("Cadastro realizado com sucesso.");
       router.push("/login");
