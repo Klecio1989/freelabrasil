@@ -1,30 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function AdminDashboardPage() {
-  const [usuario, setUsuario] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export default function AdminDashboard() {
+  const [usuarios, setUsuarios] = useState(0);
+  const [freelancers, setFreelancers] = useState(0);
+  const [contratantes, setContratantes] = useState(0);
+  const [projetos, setProjetos] = useState(0);
+  const [saquesPendentes, setSaquesPendentes] = useState(0);
+  const [pagamentos, setPagamentos] = useState(0);
 
-  const [dados, setDados] = useState({
-    usuarios: 0,
-    freelancers: 0,
-    contratantes: 0,
-    projetos: 0,
-    projetosAndamento: 0,
-    pagamentos: 0,
-    totalBruto: 0,
-    totalComissao: 0,
-    totalFreelancers: 0,
-    totalRetido: 0,
-    totalLiberado: 0,
-    saquesPendentes: 0,
-    saquesPagos: 0,
-    valorSaquesPendentes: 0,
-    valorSaquesPagos: 0,
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     carregar();
@@ -33,247 +21,181 @@ export default function AdminDashboardPage() {
   async function carregar() {
     setLoading(true);
 
-    const user = localStorage.getItem("freelabrasil_usuario");
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const parsed = JSON.parse(user);
-    setUsuario(parsed);
-
-    if (parsed.role !== "admin") {
-      setLoading(false);
-      return;
-    }
-
     const [
-      usuariosRes,
-      projetosRes,
-      andamentoRes,
-      pagamentosRes,
-      saquesRes,
+      usuariosData,
+      freelancersData,
+      contratantesData,
+      projetosData,
+      saquesData,
+      pagamentosData,
     ] = await Promise.all([
-      supabase.from("usuarios").select("*"),
-      supabase.from("projetos").select("*"),
-      supabase.from("projetos_andamento").select("*"),
-      supabase.from("pagamentos").select("*"),
-      supabase.from("saques").select("*"),
+      supabase.from("usuarios").select("*", {
+        count: "exact",
+        head: true,
+      }),
+
+      supabase
+        .from("usuarios")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .eq("tipo_usuario", "freelancer"),
+
+      supabase
+        .from("usuarios")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .eq("tipo_usuario", "contratante"),
+
+      supabase.from("projetos").select("*", {
+        count: "exact",
+        head: true,
+      }),
+
+      supabase
+        .from("saques")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .eq("status", "pendente"),
+
+      supabase.from("pagamentos").select("*", {
+        count: "exact",
+        head: true,
+      }),
     ]);
 
-    const usuarios = usuariosRes.data || [];
-    const projetos = projetosRes.data || [];
-    const andamento = andamentoRes.data || [];
-    const pagamentos = pagamentosRes.data || [];
-    const saques = saquesRes.data || [];
-
-    const totalBruto = pagamentos.reduce(
-      (acc: number, p: any) => acc + Number(p.valor_bruto || 0),
-      0
-    );
-
-    const totalComissao = pagamentos.reduce(
-      (acc: number, p: any) => acc + Number(p.comissao_plataforma || 0),
-      0
-    );
-
-    const totalFreelancers = pagamentos.reduce(
-      (acc: number, p: any) => acc + Number(p.valor_freelancer || 0),
-      0
-    );
-
-    const totalRetido = pagamentos
-      .filter((p: any) => p.status === "retido")
-      .reduce((acc: number, p: any) => acc + Number(p.valor_bruto || 0), 0);
-
-    const totalLiberado = pagamentos
-      .filter((p: any) => p.status === "liberado" || p.status === "pago")
-      .reduce((acc: number, p: any) => acc + Number(p.valor_bruto || 0), 0);
-
-    const saquesPendentes = saques.filter((s: any) => s.status === "pendente");
-    const saquesPagos = saques.filter((s: any) => s.status === "pago");
-
-    setDados({
-      usuarios: usuarios.length,
-      freelancers: usuarios.filter((u: any) => u.tipo_usuario === "freelancer").length,
-      contratantes: usuarios.filter((u: any) => u.tipo_usuario === "contratante").length,
-      projetos: projetos.length,
-      projetosAndamento: andamento.length,
-      pagamentos: pagamentos.length,
-      totalBruto,
-      totalComissao,
-      totalFreelancers,
-      totalRetido,
-      totalLiberado,
-      saquesPendentes: saquesPendentes.length,
-      saquesPagos: saquesPagos.length,
-      valorSaquesPendentes: saquesPendentes.reduce(
-        (acc: number, s: any) => acc + Number(s.valor || 0),
-        0
-      ),
-      valorSaquesPagos: saquesPagos.reduce(
-        (acc: number, s: any) => acc + Number(s.valor || 0),
-        0
-      ),
-    });
+    setUsuarios(usuariosData.count || 0);
+    setFreelancers(freelancersData.count || 0);
+    setContratantes(contratantesData.count || 0);
+    setProjetos(projetosData.count || 0);
+    setSaquesPendentes(saquesData.count || 0);
+    setPagamentos(pagamentosData.count || 0);
 
     setLoading(false);
   }
 
-  function formatar(valor: number) {
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-  }
+  const card =
+    "rounded-3xl border border-white/10 bg-white/5 p-7 shadow-xl";
 
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Carregando dashboard admin...
-      </main>
-    );
-  }
-
-  if (!usuario) {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        Você precisa estar logado.
-      </main>
-    );
-  }
-
-  if (usuario.role !== "admin") {
-    return (
-      <main className="min-h-screen bg-slate-950 p-10 text-white">
-        <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
-          <h1 className="text-3xl font-black text-red-300">Acesso negado</h1>
-          <p className="mt-3 text-slate-300">
-            Esta área é exclusiva para administradores.
-          </p>
-
-          <Link
-            href="/"
-            className="mt-6 inline-block rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
-          >
-            Voltar ao início
-          </Link>
-        </div>
+        Carregando painel admin...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+    <main className="min-h-screen bg-slate-950 px-6 py-14 text-white">
       <section className="mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
+
+        <div className="flex flex-wrap items-center justify-between gap-4">
+
           <div>
-            <h1 className="text-4xl font-black">Dashboard Admin</h1>
-            <p className="mt-3 text-slate-400">
-              Visão geral financeira, usuários, projetos e saques da FreellaBrasil.
+            <h1 className="text-5xl font-black">
+              Painel Administrativo
+            </h1>
+
+            <p className="mt-4 text-slate-300">
+              Gerencie toda a plataforma FreelaBrasil.
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <Link
-              href="/admin/saques"
-              className="rounded-xl bg-emerald-400 px-5 py-3 font-black text-slate-950"
-            >
-              Gerenciar saques
-            </Link>
+        </div>
 
-            <Link
-              href="/"
-              className="rounded-xl border border-white/20 px-5 py-3 font-bold"
-            >
-              Início
-            </Link>
+        <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+
+          <div className={card}>
+            <p className="text-slate-400">
+              Usuários
+            </p>
+
+            <h2 className="mt-3 text-5xl font-black">
+              {usuarios}
+            </h2>
           </div>
-        </div>
 
-        <h2 className="mb-4 text-2xl font-black">Usuários</h2>
-        <div className="mb-10 grid gap-4 md:grid-cols-3">
-          <Card titulo="Usuários totais" valor={String(dados.usuarios)} />
-          <Card titulo="Freelancers" valor={String(dados.freelancers)} verde />
-          <Card titulo="Contratantes" valor={String(dados.contratantes)} amarelo />
-        </div>
+          <div className={card}>
+            <p className="text-slate-400">
+              Freelancers
+            </p>
 
-        <h2 className="mb-4 text-2xl font-black">Projetos</h2>
-        <div className="mb-10 grid gap-4 md:grid-cols-3">
-          <Card titulo="Projetos publicados" valor={String(dados.projetos)} />
-          <Card titulo="Projetos em andamento" valor={String(dados.projetosAndamento)} />
-          <Card titulo="Pagamentos criados" valor={String(dados.pagamentos)} />
-        </div>
-
-        <h2 className="mb-4 text-2xl font-black">Financeiro</h2>
-        <div className="mb-10 grid gap-4 md:grid-cols-5">
-          <Card titulo="Total movimentado" valor={formatar(dados.totalBruto)} />
-          <Card titulo="Comissão plataforma" valor={formatar(dados.totalComissao)} verde />
-          <Card titulo="Freelancers líquido" valor={formatar(dados.totalFreelancers)} />
-          <Card titulo="Retido" valor={formatar(dados.totalRetido)} amarelo />
-          <Card titulo="Liberado" valor={formatar(dados.totalLiberado)} verde />
-        </div>
-
-        <h2 className="mb-4 text-2xl font-black">Saques</h2>
-        <div className="mb-10 grid gap-4 md:grid-cols-4">
-          <Card titulo="Saques pendentes" valor={String(dados.saquesPendentes)} amarelo />
-          <Card titulo="Valor pendente" valor={formatar(dados.valorSaquesPendentes)} amarelo />
-          <Card titulo="Saques pagos" valor={String(dados.saquesPagos)} verde />
-          <Card titulo="Valor pago" valor={formatar(dados.valorSaquesPagos)} verde />
-        </div>
-
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-          <h2 className="text-2xl font-black">Ações rápidas</h2>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <Link
-              href="/admin/saques"
-              className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-5 font-black text-emerald-300"
-            >
-              Aprovar saques
-            </Link>
-
-            <Link
-              href="/freelancers"
-              className="rounded-2xl border border-white/10 bg-slate-900 p-5 font-black"
-            >
-              Ver freelancers
-            </Link>
-
-            <Link
-              href="/dashboard-financeiro"
-              className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 p-5 font-black text-yellow-300"
-            >
-              Dashboard financeiro
-            </Link>
+            <h2 className="mt-3 text-5xl font-black text-emerald-300">
+              {freelancers}
+            </h2>
           </div>
+
+          <div className={card}>
+            <p className="text-slate-400">
+              Contratantes
+            </p>
+
+            <h2 className="mt-3 text-5xl font-black text-cyan-300">
+              {contratantes}
+            </h2>
+          </div>
+
+          <div className={card}>
+            <p className="text-slate-400">
+              Projetos
+            </p>
+
+            <h2 className="mt-3 text-5xl font-black text-yellow-300">
+              {projetos}
+            </h2>
+          </div>
+
+          <div className={card}>
+            <p className="text-slate-400">
+              Saques pendentes
+            </p>
+
+            <h2 className="mt-3 text-5xl font-black text-red-300">
+              {saquesPendentes}
+            </h2>
+          </div>
+
+          <div className={card}>
+            <p className="text-slate-400">
+              Pagamentos
+            </p>
+
+            <h2 className="mt-3 text-5xl font-black text-purple-300">
+              {pagamentos}
+            </h2>
+          </div>
+
         </div>
+
+        <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+
+          <Link href="/admin/saques" className={menu}>
+            💸 Gerenciar saques
+          </Link>
+
+          <Link href="/admin/usuarios" className={menu}>
+            👥 Gerenciar usuários
+          </Link>
+
+          <Link href="/admin/pagamentos" className={menu}>
+            💳 Pagamentos
+          </Link>
+
+          <Link href="/admin/projetos" className={menu}>
+            📁 Projetos
+          </Link>
+
+        </div>
+
       </section>
     </main>
   );
 }
 
-function Card({
-  titulo,
-  valor,
-  verde,
-  amarelo,
-}: {
-  titulo: string;
-  valor: string;
-  verde?: boolean;
-  amarelo?: boolean;
-}) {
-  let classe = "border-white/10 bg-white/5";
-
-  if (verde) classe = "border-emerald-400/30 bg-emerald-400/10";
-  if (amarelo) classe = "border-yellow-400/30 bg-yellow-400/10";
-
-  return (
-    <div className={`rounded-2xl border p-5 ${classe}`}>
-      <p className="text-sm text-slate-400">{titulo}</p>
-      <p className="mt-2 text-2xl font-black">{valor}</p>
-    </div>
-  );
-}
+const menu =
+  "rounded-2xl border border-white/10 bg-white/5 p-6 text-xl font-bold transition hover:border-emerald-400/40 hover:bg-white/10";
