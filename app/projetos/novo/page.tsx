@@ -15,43 +15,160 @@ export default function NovoProjetoPage() {
   const [orcamento, setOrcamento] = useState("");
   const [prazo, setPrazo] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [carregandoIA, setCarregandoIA] = useState(false);
+  const [sugestaoIA, setSugestaoIA] = useState<any>(null);
 
   useEffect(() => {
-    async function carregarUsuarioAtual() {
-      const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
+    carregarUsuarioAtual();
+  }, []);
 
-      if (!usuarioSalvo) {
-        router.push("/login");
-        return;
-      }
+  async function carregarUsuarioAtual() {
+    const usuarioSalvo = localStorage.getItem("freelabrasil_usuario");
 
-      const parsed = JSON.parse(usuarioSalvo);
-
-      if (parsed.tipo_usuario !== "contratante") {
-        alert("Apenas contratantes podem publicar projetos.");
-        router.push("/projetos");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("usuarios")
-        .select("*")
-        .eq("email", parsed.email)
-        .maybeSingle();
-
-      if (error || !data) {
-        alert("Usuário não encontrado. Faça login novamente.");
-        localStorage.removeItem("freelabrasil_usuario");
-        router.push("/login");
-        return;
-      }
-
-      localStorage.setItem("freelabrasil_usuario", JSON.stringify(data));
-      setUsuario(data);
+    if (!usuarioSalvo) {
+      router.push("/login");
+      return;
     }
 
-    carregarUsuarioAtual();
-  }, [router]);
+    const parsed = JSON.parse(usuarioSalvo);
+
+    if (parsed.tipo_usuario !== "contratante") {
+      alert("Apenas contratantes podem publicar projetos.");
+      router.push("/projetos");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("*")
+      .eq("email", parsed.email)
+      .maybeSingle();
+
+    if (error || !data) {
+      alert("Usuário não encontrado. Faça login novamente.");
+      localStorage.removeItem("freelabrasil_usuario");
+      router.push("/login");
+      return;
+    }
+
+    localStorage.setItem("freelabrasil_usuario", JSON.stringify(data));
+    setUsuario(data);
+  }
+
+  async function gerarProjetoIA(tipo: "titulo" | "descricao") {
+    try {
+      setCarregandoIA(true);
+
+      const texto =
+        tipo === "titulo"
+          ? `
+Descrição:
+${descricao}
+
+Área:
+${area}
+`
+          : `
+Título:
+${titulo}
+
+Área:
+${area}
+
+Descrição atual:
+${descricao}
+
+Prazo:
+${prazo} dias
+`;
+
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tipo: tipo === "descricao" ? "descricao_projeto" : "titulo_projeto",
+          texto,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.resultado) {
+        alert("Não foi possível gerar conteúdo com IA agora.");
+        return;
+      }
+
+      if (tipo === "descricao") {
+        setDescricao(data.resultado);
+      }
+
+      if (tipo === "titulo") {
+        const primeiraLinha = String(data.resultado)
+          .split("\n")
+          .map((linha) => linha.trim())
+          .filter(Boolean)[0];
+
+        if (primeiraLinha) {
+          setTitulo(
+            primeiraLinha
+              .replace(/^\d+\./, "")
+              .replace(/^[-•]/, "")
+              .replace(/^["']|["']$/g, "")
+              .trim()
+          );
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao consultar IA.");
+    } finally {
+      setCarregandoIA(false);
+    }
+  }
+
+  async function sugerirPrecoIA() {
+    if (!titulo.trim() || !descricao.trim()) {
+      alert("Informe pelo menos título e descrição para a IA sugerir o preço.");
+      return;
+    }
+
+    try {
+      setCarregandoIA(true);
+
+      const res = await fetch("/api/ia/sugerir-preco", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          titulo,
+          descricao,
+          area,
+          prazo,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success || !data.resultado) {
+        alert("Não foi possível sugerir preço agora.");
+        return;
+      }
+
+      setSugestaoIA(data.resultado);
+
+      if (data.resultado.preco_recomendado) {
+        setOrcamento(String(data.resultado.preco_recomendado));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao consultar IA.");
+    } finally {
+      setCarregandoIA(false);
+    }
+  }
 
   async function publicarProjeto() {
     if (!usuario?.id) {
@@ -59,7 +176,13 @@ export default function NovoProjetoPage() {
       return;
     }
 
-    if (!titulo.trim() || !descricao.trim() || !area.trim() || !orcamento.trim() || !prazo.trim()) {
+    if (
+      !titulo.trim() ||
+      !descricao.trim() ||
+      !area.trim() ||
+      !orcamento.trim() ||
+      !prazo.trim()
+    ) {
       alert("Preencha todos os campos.");
       return;
     }
@@ -74,29 +197,26 @@ export default function NovoProjetoPage() {
     try {
       setCarregando(true);
 
-      const { data, error } = await supabase
-        .from("projetos")
-        .insert([
-          {
-            titulo: titulo.trim(),
-            descricao: descricao.trim(),
-            area: area.trim(),
-            orcamento: orcamento.trim(),
-            prazo: prazoNumero,
-            contratante_id: usuario.id,
-          },
-        ])
-        .select();
+      const { error } = await supabase.from("projetos").insert([
+        {
+          titulo: titulo.trim(),
+          descricao: descricao.trim(),
+          area: area.trim(),
+          orcamento: orcamento.trim(),
+          prazo: prazoNumero,
+          contratante_id: usuario.id,
+        },
+      ]);
 
       if (error) {
         console.error("ERRO SUPABASE:", error);
-        alert(error.message || "Erro ao criar projeto");
+        alert(error.message || "Erro ao criar projeto.");
         return;
       }
 
       const novoTotalProjetos = Number(usuario.projetos_publicados || 0) + 1;
 
-      const { data: usuarioAtualizado, error: updateUserError } = await supabase
+      const { data: usuarioAtualizado } = await supabase
         .from("usuarios")
         .update({
           projetos_publicados: novoTotalProjetos,
@@ -105,15 +225,18 @@ export default function NovoProjetoPage() {
         .select()
         .single();
 
-      if (!updateUserError && usuarioAtualizado) {
-        localStorage.setItem("freelabrasil_usuario", JSON.stringify(usuarioAtualizado));
+      if (usuarioAtualizado) {
+        localStorage.setItem(
+          "freelabrasil_usuario",
+          JSON.stringify(usuarioAtualizado)
+        );
       }
 
       alert("Projeto criado com sucesso!");
       router.push("/projetos");
     } catch (error) {
       console.error("ERRO GERAL:", error);
-      alert("Erro ao criar projeto");
+      alert("Erro ao criar projeto.");
     } finally {
       setCarregando(false);
     }
@@ -151,47 +274,126 @@ export default function NovoProjetoPage() {
               <label className="mb-2 block text-sm font-semibold text-slate-200">
                 Título do projeto
               </label>
+
               <input
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Ex: Projeto de planejamento"
+                placeholder="Ex: Dashboard Power BI para controle financeiro"
                 className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-4 text-white outline-none placeholder:text-slate-500"
               />
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => gerarProjetoIA("titulo")}
+                  disabled={carregandoIA}
+                  className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-60"
+                >
+                  {carregandoIA ? "Gerando..." : "✨ Sugerir título com IA"}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-200">
                 Descrição
               </label>
+
               <textarea
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                placeholder="Descreva o projeto, entregáveis e contexto"
-                rows={6}
+                placeholder="Descreva o projeto, entregáveis, objetivo e contexto"
+                rows={7}
                 className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-4 text-white outline-none placeholder:text-slate-500"
               />
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => gerarProjetoIA("descricao")}
+                  disabled={carregandoIA}
+                  className="rounded-xl bg-purple-400 px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-60"
+                >
+                  {carregandoIA ? "Melhorando..." : "✨ Melhorar descrição com IA"}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-200">
                 Área
               </label>
+
               <input
                 value={area}
                 onChange={(e) => setArea(e.target.value)}
-                placeholder="Ex: Planejamento Logístico"
+                placeholder="Ex: Power BI, Excel, Python, Design, Consultoria"
                 className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-4 text-white outline-none placeholder:text-slate-500"
               />
+            </div>
+
+            <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-yellow-300">
+                    Precificação com IA
+                  </h3>
+
+                  <p className="mt-1 text-sm text-yellow-100">
+                    A IA analisa título, descrição, área e prazo para sugerir uma faixa justa.
+                  </p>
+                </div>
+
+                <button
+                  onClick={sugerirPrecoIA}
+                  disabled={carregandoIA}
+                  className="rounded-xl bg-yellow-400 px-5 py-3 font-black text-black disabled:opacity-60"
+                >
+                  {carregandoIA ? "Analisando..." : "Sugerir preço com IA"}
+                </button>
+              </div>
+
+              {sugestaoIA && (
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl bg-slate-950/60 p-4">
+                    <p className="text-xs text-slate-400">Mínimo</p>
+                    <p className="text-xl font-black">
+                      R$ {Number(sugestaoIA.preco_minimo || 0).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-emerald-400/10 p-4">
+                    <p className="text-xs text-emerald-300">Recomendado</p>
+                    <p className="text-xl font-black text-emerald-300">
+                      R$ {Number(sugestaoIA.preco_recomendado || 0).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-950/60 p-4">
+                    <p className="text-xs text-slate-400">Máximo</p>
+                    <p className="text-xl font-black">
+                      R$ {Number(sugestaoIA.preco_maximo || 0).toFixed(2)}
+                    </p>
+                  </div>
+
+                  {sugestaoIA.justificativa && (
+                    <p className="md:col-span-3 text-sm text-yellow-100">
+                      {sugestaoIA.justificativa}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-200">
                 Orçamento
               </label>
+
               <input
                 value={orcamento}
                 onChange={(e) => setOrcamento(e.target.value)}
-                placeholder="Ex: R$ 500"
+                placeholder="Ex: 500"
                 className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-4 text-white outline-none placeholder:text-slate-500"
               />
             </div>
@@ -200,6 +402,7 @@ export default function NovoProjetoPage() {
               <label className="mb-2 block text-sm font-semibold text-slate-200">
                 Prazo em dias
               </label>
+
               <input
                 value={prazo}
                 onChange={(e) => setPrazo(e.target.value)}
