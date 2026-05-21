@@ -111,7 +111,8 @@ export default function RootLayout({
 
               <Link
                 href="/login"
-                className="rounded-xl border border-white/10 px-5 py-2 text-sm font-bold transition hover:bg-white/10"
+                className="rounded-xl border border-white/10 bg-slate-900 px-5 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                style={{ color: "white" }}
               >
                 Entrar
               </Link>
