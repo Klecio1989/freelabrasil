@@ -103,32 +103,52 @@ export default function NovaPropostaClient({ projetoId }: any) {
     try {
       setCarregandoIA(true);
 
-      const res = await fetch("/api/ia/melhorar-proposta", {
+      const res = await fetch("/api/ia", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
-          projeto,
-          proposta: mensagem,
-          valor,
-          prazo,
-          perfilFreelancer: usuario
-        })
+          tipo: "melhorar_proposta",
+
+          texto: `
+Projeto:
+${projeto?.titulo}
+
+Descrição:
+${projeto?.descricao}
+
+Valor:
+${valor}
+
+Prazo:
+${prazo} dias
+
+Proposta freelancer:
+${mensagem}
+`,
+        }),
       });
 
       const data = await res.json();
 
-      if (!data.success || !data.resultado) {
+      if (!data.resultado) {
         alert("Não foi possível melhorar a proposta agora.");
         return;
       }
 
-      setAnaliseIA(data.resultado);
+      setMensagem(data.resultado);
 
-      if (data.resultado.proposta_melhorada) {
-        setMensagem(data.resultado.proposta_melhorada);
-      }
+      setAnaliseIA({
+        pontos_fortes: [
+          "Proposta otimizada com IA",
+          "Texto mais profissional",
+          "Maior clareza e persuasão",
+        ],
+
+        alertas: [],
+      });
 
     } catch (error) {
       console.error(error);
@@ -169,8 +189,8 @@ export default function NovaPropostaClient({ projetoId }: any) {
           valor,
           prazo,
           mensagem,
-          status: "pendente"
-        }
+          status: "pendente",
+        },
       ]);
 
       if (error) {
@@ -182,7 +202,8 @@ export default function NovaPropostaClient({ projetoId }: any) {
       await supabase
         .from("usuarios")
         .update({
-          propostas_enviadas: Number(usuario.propostas_enviadas || 0) + 1
+          propostas_enviadas:
+            Number(usuario.propostas_enviadas || 0) + 1,
         })
         .eq("id", usuario.id);
 
@@ -190,17 +211,22 @@ export default function NovaPropostaClient({ projetoId }: any) {
         await enviarEmail({
           para: contratante.email,
           assunto: "Nova proposta recebida 🚀",
+
           titulo: `Você recebeu uma nova proposta no projeto "${projeto?.titulo}"`,
+
           mensagem: `
-            O freelancer ${usuario.nome} enviou uma proposta para seu projeto.
+O freelancer ${usuario.nome} enviou uma proposta para seu projeto.
 
-            Valor proposto: ${valor}
-            Prazo: ${prazo} dias
+Valor proposto: ${valor}
+Prazo: ${prazo} dias
 
-            Acesse a plataforma para visualizar os detalhes e iniciar uma conversa.
+Acesse a plataforma para visualizar os detalhes e iniciar uma conversa.
           `,
+
           botaoTexto: "Ver propostas",
-          botaoLink: "https://www.freellabrasil.com.br/propostas-recebidas"
+
+          botaoLink:
+            "https://www.freellabrasil.com.br/propostas-recebidas",
         });
       }
 
@@ -208,15 +234,20 @@ export default function NovaPropostaClient({ projetoId }: any) {
         await supabase.from("notificacoes").insert([
           {
             usuario_id: contratante.id,
+
             titulo: "Nova proposta recebida 🚀",
+
             descricao: `${usuario.nome} enviou uma proposta para o projeto "${projeto?.titulo}".`,
+
             link: "/propostas-recebidas",
-            lida: false
-          }
+
+            lida: false,
+          },
         ]);
       }
 
       alert("Proposta enviada.");
+
       router.push("/projetos");
 
     } catch (error) {
@@ -238,6 +269,7 @@ export default function NovaPropostaClient({ projetoId }: any) {
 
           {projeto && (
             <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+
               <p className="text-sm text-slate-400">
                 Projeto
               </p>
@@ -251,14 +283,16 @@ export default function NovaPropostaClient({ projetoId }: any) {
               </p>
 
               <p className="mt-3 text-sm text-emerald-300">
-                Área: {projeto.area || "Não informada"} | Orçamento:{" "}
-                {projeto.orcamento || "Não informado"}
+                Área: {projeto.area || "Não informada"} |
+                Orçamento: {projeto.orcamento || "Não informado"}
               </p>
+
             </div>
           )}
         </div>
 
         <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl">
+
           <div className="grid gap-5">
 
             <div>
@@ -302,15 +336,17 @@ export default function NovaPropostaClient({ projetoId }: any) {
             </div>
 
             <div className="rounded-2xl border border-purple-400/20 bg-purple-400/10 p-5">
+
               <div className="flex flex-wrap items-center justify-between gap-4">
 
                 <div>
                   <h3 className="text-lg font-black text-purple-300">
-                    Melhorar proposta com IA
+                    ✨ Melhorar proposta com IA
                   </h3>
 
                   <p className="mt-1 text-sm text-purple-100">
-                    A IA deixa sua proposta mais profissional, clara e convincente.
+                    A IA deixa sua proposta mais profissional,
+                    clara e convincente.
                   </p>
                 </div>
 
@@ -319,8 +355,11 @@ export default function NovaPropostaClient({ projetoId }: any) {
                   disabled={carregandoIA}
                   className="rounded-xl bg-purple-400 px-5 py-3 font-black text-slate-950 disabled:opacity-60"
                 >
-                  {carregandoIA ? "Melhorando..." : "Melhorar com IA"}
+                  {carregandoIA
+                    ? "Melhorando..."
+                    : "Melhorar com IA"}
                 </button>
+
               </div>
 
               {analiseIA && (
@@ -328,34 +367,27 @@ export default function NovaPropostaClient({ projetoId }: any) {
 
                   {analiseIA.pontos_fortes?.length > 0 && (
                     <div>
+
                       <p className="font-bold text-purple-200">
-                        Pontos fortes:
+                        Melhorias aplicadas:
                       </p>
 
                       <ul className="mt-2 list-disc pl-6 text-sm text-slate-200">
-                        {analiseIA.pontos_fortes.map((item: string, i: number) => (
-                          <li key={i}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
 
-                  {analiseIA.alertas?.length > 0 && (
-                    <div>
-                      <p className="font-bold text-yellow-300">
-                        Alertas:
-                      </p>
+                        {analiseIA.pontos_fortes.map(
+                          (item: string, i: number) => (
+                            <li key={i}>{item}</li>
+                          )
+                        )}
 
-                      <ul className="mt-2 list-disc pl-6 text-sm text-yellow-100">
-                        {analiseIA.alertas.map((item: string, i: number) => (
-                          <li key={i}>{item}</li>
-                        ))}
                       </ul>
+
                     </div>
                   )}
 
                 </div>
               )}
+
             </div>
 
             <button
@@ -363,18 +395,23 @@ export default function NovaPropostaClient({ projetoId }: any) {
               disabled={carregando}
               className="rounded-xl bg-emerald-400 px-6 py-4 font-black text-slate-950 disabled:opacity-60"
             >
-              {carregando ? "Enviando..." : "Enviar proposta"}
+              {carregando
+                ? "Enviando..."
+                : "Enviar proposta"}
             </button>
 
             {usuario && (
               <p className="text-sm text-slate-400">
-                Plano: {usuario.plano || "gratuito"} | Propostas usadas:{" "}
+                Plano: {usuario.plano || "gratuito"} |
+                Propostas usadas:{" "}
                 {Number(usuario.propostas_enviadas || 0)}
               </p>
             )}
 
           </div>
+
         </div>
+
       </section>
     </main>
   );
