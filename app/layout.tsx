@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,63 +20,38 @@ export const metadata: Metadata = {
     "excel",
     "python",
     "automação",
-    "desenvolvedor",
     "dashboard",
-    "freela",
-    "programador",
-    "designer",
-    "marketing digital",
+    "desenvolvedor",
+    "design",
   ],
-
-  authors: [
-    {
-      name: "FreellaBrasil",
-      url: "https://www.freellabrasil.com.br",
-    },
-  ],
-
-  creator: "FreellaBrasil",
-  publisher: "FreellaBrasil",
 
   openGraph: {
-    type: "website",
-    locale: "pt_BR",
-    url: "https://www.freellabrasil.com.br",
-    siteName: "FreellaBrasil",
-
-    title: "FreellaBrasil | Marketplace de Freelancers",
-
+    title: "FreellaBrasil",
     description:
-      "Contrate freelancers ou encontre projetos em Power BI, Excel, Python, Automação, Design, Desenvolvimento Web e muito mais.",
+      "Marketplace profissional de freelancers do Brasil.",
+
+    url: "https://www.freellabrasil.com.br",
+
+    siteName: "FreellaBrasil",
 
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "FreellaBrasil",
       },
     ],
+
+    locale: "pt_BR",
+    type: "website",
   },
 
   twitter: {
     card: "summary_large_image",
-
-    title: "FreellaBrasil | Marketplace de Freelancers",
-
+    title: "FreellaBrasil",
     description:
-      "Encontre freelancers e projetos em tecnologia, automação, design, marketing e desenvolvimento.",
-
+      "Marketplace profissional de freelancers.",
     images: ["/og-image.png"],
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-
-  alternates: {
-    canonical: "https://www.freellabrasil.com.br",
   },
 };
 
@@ -86,7 +62,111 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className="bg-slate-950 text-white">
+
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+
+            <Link
+              href="/"
+              className="flex items-center gap-3"
+            >
+              <img
+                src="/logo.png"
+                alt="FreellaBrasil"
+                className="h-10 w-auto"
+              />
+
+              <span className="text-2xl font-black">
+                FreellaBrasil
+              </span>
+            </Link>
+
+            <nav className="hidden items-center gap-8 md:flex">
+
+              <Link
+                href="/projetos"
+                className="text-sm font-semibold text-slate-300 transition hover:text-white"
+              >
+                Projetos
+              </Link>
+
+              <Link
+                href="/freelancers"
+                className="text-sm font-semibold text-slate-300 transition hover:text-white"
+              >
+                Freelancers
+              </Link>
+
+              <Link
+                href="/planos"
+                className="text-sm font-semibold text-slate-300 transition hover:text-white"
+              >
+                Planos
+              </Link>
+
+            </nav>
+
+            <div className="flex items-center gap-3">
+
+              <Link
+                href="/login"
+                className="rounded-xl border border-white/10 px-5 py-2 text-sm font-bold transition hover:bg-white/10"
+              >
+                Entrar
+              </Link>
+
+              <Link
+                href="/cadastro"
+                className="rounded-xl bg-emerald-400 px-5 py-2 text-sm font-black text-slate-950 transition hover:scale-[1.02]"
+              >
+                Criar conta
+              </Link>
+
+            </div>
+
+          </div>
+        </header>
+
+        {children}
+
+        <footer className="mt-20 border-t border-white/10 bg-slate-950">
+          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 md:flex-row md:items-center md:justify-between">
+
+            <div>
+              <h2 className="text-2xl font-black">
+                FreellaBrasil
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-400">
+                Marketplace profissional de freelancers do Brasil.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-6 text-sm text-slate-400">
+
+              <Link href="/planos">
+                Planos
+              </Link>
+
+              <Link href="/projetos">
+                Projetos
+              </Link>
+
+              <Link href="/login">
+                Login
+              </Link>
+
+              <Link href="/cadastro">
+                Cadastro
+              </Link>
+
+            </div>
+
+          </div>
+        </footer>
+
+      </body>
     </html>
   );
 }
